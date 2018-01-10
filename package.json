@@ -1,0 +1,42 @@
+{
+  "name": "6502",
+  "version": "0.1.0",
+  "description": "A debuggable, instrumentable 6502 processor simulator written in JavaScript. No runtime dependencies.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "mocha --require babel-core/register"
+  },
+  "babel": {
+    "presets": [
+      "env"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bleroy/6502.git"
+  },
+  "keywords": [
+    "6502",
+    "processor",
+    "emulator",
+    "simulator",
+    "debugger",
+    "instrumented"
+  ],
+  "author": "Bertrand Le Roy",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bleroy/6502/issues"
+  },
+  "homepage": "https://github.com/bleroy/6502#readme",
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-preset-env": "^1.6.1",
+    "chai": "^4.1.2",
+    "mocha": "^4.1.0"
+  },
+  "dependencies": {}
+}
