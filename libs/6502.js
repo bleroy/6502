@@ -231,14 +231,14 @@ export let AddressModes = {
         name: 'ind',
         description: 'indirect',
         evaluate: (processor, address) => new Address(processor.addressAt(address)),
-        disassemble: address => `(${hex(address)})`,
+        disassemble: address => `(${new Address(address).toString()})`,
         bytes: 2
     }),
     Xind: new AddressMode({
         name: 'X,ind',
         description: 'X-indexed, indirect',
-        evaluate: (processor, address) => new Address(processor.addressAt((address + processor.X) & 0xFF)),
-        disassemble: address => `(${hex(address)},X)`,
+        evaluate: (processor, address) => new Address(processor.addressAt((address + processor.X) & 0xFF, true)),
+        disassemble: address => `(${new Byte(address).toString()},X)`,
         bytes: 1
     }),
     indY: new AddressMode({
@@ -450,8 +450,8 @@ export default class MCS6502 {
     get SR() {}
     set SR(value) {}
 
-    addressAt(pointer) {
-        return this.memory[pointer] + 256 * this.memory[pointer + 1];
+    addressAt(pointer, zeroPage = false) {
+        return this.memory[pointer] + 256 * this.memory[(pointer + 1) & (zeroPage ? 0xFF : 0xFFFF)];
     }
 
     peek(address) {

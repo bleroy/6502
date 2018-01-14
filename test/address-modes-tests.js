@@ -134,4 +134,72 @@ describe('AddressModes', () => {
             AddressModes.immediate.disassemble(42).should.equal('#$2A');
         });
     });
+
+    describe('implied', () => {
+        it('evaluates as null', () => {
+            let val = AddressModes.implied.evaluate();
+
+            expect(val).to.be.null;
+        });
+
+        it('disassembles as an empty string', () => {
+            AddressModes.implied.disassemble().should.equal('');
+        });
+    });
+
+    describe('indirect', () => {
+        it('evaluates an address as the LSB-MSB address in memory at the address specified', () => {
+            let proc = new MCS6502();
+            proc.poke(1000, 0xD0);
+            proc.poke(1001, 0x07);
+
+            let val = AddressModes.indirect.evaluateAddress(proc, 1000);
+
+            (val instanceof Address).should.be.true;
+            val.should.equal(0x07D0);
+        });
+
+        it('disassembles as #$##', () => {
+            AddressModes.indirect.disassemble(0x07D0).should.equal('($07D0)');
+        });
+    });
+
+    describe('X-indexed, indirect', () => {
+        it('evaluates as the byte at the LSB-MSB addresspointed to by the 0-page address specified, indexed by X', () => {
+            let proc = new MCS6502({X: 5});
+            proc.poke(0x43, 0x15);
+            proc.poke(0x44, 0x24);
+            proc.poke(0x2415, 42);
+
+            let val = AddressModes.Xind.evaluate(proc, 0x3E);
+
+            (val instanceof Byte).should.be.true;
+            val.should.equal(42);
+        });
+
+        it('wraps around the 0 page', () => {
+            let proc = new MCS6502({X: 5});
+            proc.poke(0xFF, 0x15);
+            proc.poke(0x00, 0x24);
+            proc.poke(0x2415, 42);
+
+            let val = AddressModes.Xind.evaluate(proc, 0xFA);
+
+            (val instanceof Byte).should.be.true;
+            val.should.equal(42);
+
+            proc.poke(0x01, 0xFE);
+            proc.poke(0x02, 0xCE);
+            proc.poke(0xCEFE, 10);
+
+            val = AddressModes.Xind.evaluate(proc, 0xFC);
+
+            (val instanceof Byte).should.be.true;
+            val.should.equal(10);
+        });
+
+        it('disassembles as ($##,X)', () => {
+            AddressModes.Xind.disassemble(0xD0).should.equal('($D0,X)');
+        });
+    });
 });
