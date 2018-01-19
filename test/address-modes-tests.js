@@ -66,7 +66,7 @@ describe('AddressMode', () => {
 });
 
 describe('AddressModes', () => {
-    describe('A', () => {
+    describe('Accumulator', () => {
         it('evaluates the value of the accumulator', () => {
             let proc = new MCS6502({ A: 42 });
             AddressModes.A.evaluate(proc).should.equal(42);
@@ -77,7 +77,7 @@ describe('AddressModes', () => {
         });
     });
 
-    describe('abs', () => {
+    describe('Absolute', () => {
         it('evaluates as the byte at an absolute address', () => {
             let proc = new MCS6502();
             proc.poke(1000, 42);
@@ -92,7 +92,7 @@ describe('AddressModes', () => {
         });
     });
 
-    describe('abs,X', () => {
+    describe('Absolute, X-indexed', () => {
         it('evaluates as the byte at an absolute address, indexed with X', () => {
             let proc = new MCS6502({ X: 30 });
             proc.poke(1000, 42);
@@ -107,7 +107,7 @@ describe('AddressModes', () => {
         });
     });
 
-    describe('abs,Y', () => {
+    describe('Absolute, Y-indexed', () => {
         it('evaluates as the byte at an absolute address, indexed with Y', () => {
             let proc = new MCS6502({ Y: 30 });
             proc.poke(1000, 42);
@@ -122,7 +122,7 @@ describe('AddressModes', () => {
         });
     });
 
-    describe('immediate', () => {
+    describe('Immediate', () => {
         it('evaluates as the byte passed in', () => {
             let val = AddressModes.immediate.evaluate(null, 42);
 
@@ -135,7 +135,7 @@ describe('AddressModes', () => {
         });
     });
 
-    describe('implied', () => {
+    describe('Implied', () => {
         it('evaluates as null', () => {
             let val = AddressModes.implied.evaluate();
 
@@ -147,7 +147,7 @@ describe('AddressModes', () => {
         });
     });
 
-    describe('indirect', () => {
+    describe('Indirect', () => {
         it('evaluates an address as the LSB-MSB address in memory at the address specified', () => {
             let proc = new MCS6502();
             proc.poke(1000, 0xD0);
@@ -203,7 +203,7 @@ describe('AddressModes', () => {
         });
     });
 
-    describe('indirect, Y-indexed', () => {
+    describe('Indirect, Y-indexed', () => {
         it('evaluates as the byte at the Y-indexed LSB-MSB address pointed to by the 0-page address specified', () => {
             let proc = new MCS6502({Y: 5});
             proc.poke(0x43, 0x15);
@@ -233,7 +233,7 @@ describe('AddressModes', () => {
         });
     });
 
-    describe('relative', () => {
+    describe('Relative', () => {
         it('evaluates as the PC plus the argument for a negative offset', () => {
             let proc = new MCS6502({PC: 0x202});
 
@@ -255,6 +255,71 @@ describe('AddressModes', () => {
         it('disassembles as $##', () => {
             AddressModes.rel.disassemble(0x50).should.equal('$50');
             AddressModes.rel.disassemble(-0x50).should.equal('$B0');
+        });
+    });
+
+    describe('Zero page', () => {
+        it('evaluates as the byte in page zerobeing pointed to', () => {
+            let proc = new MCS6502();
+            proc.poke(10, 42);
+            let val = AddressModes.zpg.evaluate(proc, 10);
+
+            (val instanceof Byte).should.be.true;
+            val.should.equal(42);
+        });
+
+        it('disassembles as $##', () => {
+            AddressModes.zpg.disassemble(0xE8).should.equal('$E8');
+        });
+    });
+
+    describe('Zero page, X-indexed', () => {
+        it('evaluates as the byte at an absolute zero page address, indexed with X', () => {
+            let proc = new MCS6502({ X: 30 });
+            proc.poke(40, 42);
+            let val = AddressModes.zpgX.evaluate(proc, 10);
+
+            (val instanceof Byte).should.be.true;
+            val.should.equal(42);
+        });
+
+        it('wraps around the 0 page', () => {
+            let proc = new MCS6502({Y: 5});
+            proc.poke(0x04, 42);
+
+            let val = AddressModes.zpgY.evaluate(proc, 0xFF);
+
+            (val instanceof Byte).should.be.true;
+            val.should.equal(42);
+        });
+
+        it('disassembles as $##,X\'', () => {
+            AddressModes.zpgX.disassemble(0xE8).should.equal('$E8,X');
+        });
+    });
+
+    describe('Zero page, Y-indexed', () => {
+        it('evaluates as the byte at an absolute zero page address, indexed with Y', () => {
+            let proc = new MCS6502({ Y: 30 });
+            proc.poke(40, 42);
+            let val = AddressModes.zpgY.evaluate(proc, 10);
+
+            (val instanceof Byte).should.be.true;
+            val.should.equal(42);
+        });
+
+        it('wraps around the 0 page', () => {
+            let proc = new MCS6502({X: 5});
+            proc.poke(0x04, 42);
+
+            let val = AddressModes.zpgX.evaluate(proc, 0xFF);
+
+            (val instanceof Byte).should.be.true;
+            val.should.equal(42);
+        });
+
+        it('disassembles as $##,Y', () => {
+            AddressModes.zpgY.disassemble(0xE8).should.equal('$E8,Y');
         });
     });
 });

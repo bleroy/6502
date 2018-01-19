@@ -259,21 +259,21 @@ export let AddressModes = {
         name: 'zpg',
         description: 'zero page',
         evaluate: (processor, address) => new Address(address),
-        disassemble: address => `${hex(address)}`,
+        disassemble: address => `${new Byte(address).toString()}`,
         bytes: 1
     }),
     zpgX: new AddressMode({
         name: 'zpg,X',
         description: 'zero page, X-indexed',
         evaluate: (processor, address) => new Address((address + processor.X) & 0xFF),
-        disassemble: address => `${hex(address)},X`,
+        disassemble: address => `${new Byte(address).toString()},X`,
         bytes: 1
     }),
     zpgY: new AddressMode({
         name: 'zpg,Y',
         description: 'zero page, Y-indexed',
         evaluate: (processor, address) => new Address((address + processor.Y) & 0xFF),
-        disassemble: address => `${hex(address)},Y`,
+        disassemble: address => `${new Byte(address).toString()},Y`,
         bytes: 1
     })
 }
@@ -467,10 +467,16 @@ export default class MCS6502 {
             if (proc.PC == address) handler(proc);
         });
     }
-    // TODO: add remove that works, other kinds of breakpoints
+    // TODO: add remove that works, other kinds of breakpoints.
+    // Also, move all handlers to really be breakpoints with different traps.
 
-    get SR() {}
-    set SR(value) {}
+    get SR() {
+        return this[srSymbol];
+    }
+    set SR(value) {
+        this[srSymbol] = value;
+        // TODO: call breakpoints
+    }
 
     addressAt(pointer, zeroPage = false) {
         return this[memorySymbol][pointer] + 256 * this[memorySymbol][(pointer + 1) & (zeroPage ? 0xFF : 0xFFFF)];
@@ -484,6 +490,7 @@ export default class MCS6502 {
         // TODO: add event handlers
     }
 
+    // TODO
     push(value) {}
     pop() {}
 
