@@ -165,7 +165,7 @@ describe('AddressModes', () => {
     });
 
     describe('X-indexed, indirect', () => {
-        it('evaluates as the byte at the LSB-MSB addresspointed to by the 0-page address specified, indexed by X', () => {
+        it('evaluates as the byte at the LSB-MSB address pointed to by the 0-page address specified, indexed by X', () => {
             let proc = new MCS6502({X: 5});
             proc.poke(0x43, 0x15);
             proc.poke(0x44, 0x24);
@@ -200,6 +200,61 @@ describe('AddressModes', () => {
 
         it('disassembles as ($##,X)', () => {
             AddressModes.Xind.disassemble(0xD0).should.equal('($D0,X)');
+        });
+    });
+
+    describe('indirect, Y-indexed', () => {
+        it('evaluates as the byte at the Y-indexed LSB-MSB address pointed to by the 0-page address specified', () => {
+            let proc = new MCS6502({Y: 5});
+            proc.poke(0x43, 0x15);
+            proc.poke(0x44, 0x24);
+            proc.poke(0x241A, 42);
+
+            let val = AddressModes.indY.evaluate(proc, 0x43);
+
+            (val instanceof Byte).should.be.true;
+            val.should.equal(42);
+        });
+
+        it('wraps around the 0 page', () => {
+            let proc = new MCS6502({Y: 5});
+            proc.poke(0xFF, 0x15);
+            proc.poke(0x00, 0x24);
+            proc.poke(0x241A, 42);
+
+            let val = AddressModes.indY.evaluate(proc, 0xFF);
+
+            (val instanceof Byte).should.be.true;
+            val.should.equal(42);
+        });
+
+        it('disassembles as ($##),Y', () => {
+            AddressModes.indY.disassemble(0xD0).should.equal('($D0),Y');
+        });
+    });
+
+    describe('relative', () => {
+        it('evaluates as the PC plus the argument for a negative offset', () => {
+            let proc = new MCS6502({PC: 0x202});
+
+            let val = AddressModes.rel.evaluateAddress(proc, -0x50);
+
+            (val instanceof Address).should.be.true;
+            val.should.equal(0x1B2);
+        });
+
+        it('evaluates as the PC plus the argument for a positive offset', () => {
+            let proc = new MCS6502({PC: 0x2E2});
+
+            let val = AddressModes.rel.evaluateAddress(proc, 0x50);
+
+            (val instanceof Address).should.be.true;
+            val.should.equal(0x332);
+        });
+
+        it('disassembles as $##', () => {
+            AddressModes.rel.disassemble(0x50).should.equal('$50');
+            AddressModes.rel.disassemble(-0x50).should.equal('$B0');
         });
     });
 });

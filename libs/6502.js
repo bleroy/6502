@@ -244,15 +244,15 @@ export let AddressModes = {
     indY: new AddressMode({
         name: 'ind,Y',
         description: 'indirect, Y-indexed',
-        evaluate: (processor, address) => new Address(processor.addressAt(address) + processor.Y),
-        disassemble: address => `(${hex(address)}),Y`,
+        evaluate: (processor, address) => new Address(processor.addressAt(address, true) + processor.Y),
+        disassemble: address => `(${new Byte(address).toString()}),Y`,
         bytes: 1
     }),
     rel: new AddressMode({
         name: 'rel',
         description: 'relative',
         evaluate: (processor, offset) => new Address(processor.PC + offset),
-        disassemble: offset => `${hex(offset)}`,
+        disassemble: offset => `${new Byte(offset).toString()}`,
         bytes: 1
     }),
     zpg: new AddressMode({
@@ -375,23 +375,31 @@ class InvalidInstruction extends Instruction {
     }
 }
 
+let aSymbol = Symbol('a'), xSymbol = Symbol('x'), ySymbol = Symbol('y'),
+    spSymbol = Symbol('sp'), pcSymbol = Symbol('pc'), srSymbol = ('sr'),
+    memorySymbol = Symbol('memory'), aHandlersSymbol = Symbol('aHandlers'),
+    xHandlersSymbol = Symbol('xHandlers'), yHandlersSymbol = Symbol('yHandlers'),
+    breakpointsSymbol = Symbol('breakpoints');
+
 export default class MCS6502 {
     constructor({memory = new Uint8Array(65536), 
         A = 0, X = 0, Y = 0, SP = 0, PC = 0, 
         N = false, V = false, B = false, D = false, 
         I = false, Z = false, C = false} = {}) {
 
-        this.memory = memory;
-        this.a = A;
-        this.x = X;
-        this.y = Y;
-        this.sp = SP;
-        this.pc = PC;
+        this[memorySymbol] = memory;
+        this[aSymbol] = A;
+        this[xSymbol] = X;
+        this[ySymbol] = Y;
+        this[spSymbol] = SP;
+        this[pcSymbol] = PC;
+        this[srSymbol] = new Byte((N ? 0x80 : 0) | (V ? 0x40 : 0) | (B ? 0x10 : 0)
+            | (D ? 0x08 : 0) | (I ? 0x04 : 0) | (Z ? 0x02 : 0) | (C ? 0x01 : 0));
 
-        this.aHandlers = delegate();
-        this.xHandlers = delegate();
-        this.yHandlers = delegate();
-        this.breakpoints = delegate();
+        this[aHandlersSymbol] = delegate();
+        this[xHandlersSymbol] = delegate();
+        this[yHandlersSymbol] = delegate();
+        this[breakpointsSymbol] = delegate();
     }
 
     static get instructionSet() {
@@ -406,59 +414,73 @@ export default class MCS6502 {
     }
 
     get A() {
-        return this.a;
+        return this[aSymbol];
     }
     set A(value) {
-        this.a = value;
-        this.aHandlers.call(value);
+        this[aSymbol] = value;
+        this[aHandlersSymbol].call(value);
     }
     addAChange(handler) {
-        this.aHandlers.push(handler);
+        this[aHandlersSymbol].push(handler);
     }
     removeAChange(handler) {
-        this.aHandlers.remove(handler);
+        this[aHandlersSymbol].remove(handler);
     }
 
     get X() {
-        return this.x;
+        return this[xSymbol];
     }
     set X(value) {
-        this.X = value;
-        this.xHandlers.call(value);
+        this[xSymbol] = value;
+        this[xHandlersSymbol].call(value);
     }
     addXChange(handler) {
-        this.xHandlers.push(handler);
+        this[xHandlersSymbol].push(handler);
     }
     removeXChange(handler) {
-        this.xHandlers.remove(handler);
+        this[xHandlersSymbol].remove(handler);
     }
 
     get Y() {
-        return this.y;
+        return this[ySymbol];
     }
     set Y(value) {
-        this.y = value;
-        this.yHandlers.call(value);
+        this[ySymbol] = value;
+        this[yHandlersSymbol].call(value);
     }
     addYChange(handler) {
-        this.yHandlers.push(handler);
+        this[yHandlersSymbol].push(handler);
     }
     removeYChange(handler) {
-        this.yHandlers.remove(handler);
+        this[yHandlersSymbol].remove(handler);
     }
+
+    get PC() {
+        return this[pcSymbol];
+    }
+    set PC(value) {
+        this[pcSymbol] = value;
+        this[breakpointsSymbol].call(this);
+    }
+    addAddressBreakpoint(address, handler) {
+        this[breakpointsSymbol].push(proc => {
+            if (proc.PC == address) handler(proc);
+        });
+    }
+    // TODO: add remove that works, other kinds of breakpoints
 
     get SR() {}
     set SR(value) {}
 
     addressAt(pointer, zeroPage = false) {
-        return this.memory[pointer] + 256 * this.memory[(pointer + 1) & (zeroPage ? 0xFF : 0xFFFF)];
+        return this[memorySymbol][pointer] + 256 * this[memorySymbol][(pointer + 1) & (zeroPage ? 0xFF : 0xFFFF)];
     }
 
     peek(address) {
-        return new Byte(this.memory[address.valueOf()]);
+        return new Byte(this[memorySymbol][address.valueOf()]);
     }
     poke(address, value) {
-        this.memory[address.valueOf()] = value;
+        this[memorySymbol][address.valueOf()] = value;
         // TODO: add event handlers
     }
 
