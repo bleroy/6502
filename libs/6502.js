@@ -182,8 +182,9 @@ export class AddressMode {
     }
 }
 
-// Here be dragons...
-
+/**
+ * An object containing implementations for all of a 6502's address modes
+ */
 export let AddressModes = {
     A: new AddressMode({
         name: 'A',
@@ -278,24 +279,58 @@ export let AddressModes = {
     })
 }
 
-class Instruction {
-    constructor({mnemonic, opCode, description, implementation, addressMode = AddressModes.implied, cycles}) {
+
+/**
+ * An instruction implementation callback.
+ * @callback instructionImplementation
+ * @param {MCS6502} processor - the processor to use to evaluate the address mode.
+ * @param {(Byte|Address)=} operand - the operand to evaluate.
+ * @returns {Number} - the number of cycles used by the instruction.
+ */
+
+ /**
+ * A base class for all 6502 instructions.
+ */
+export class Instruction {
+    /**
+     * Constructs a base instruction
+     * @param {Object} instr
+     * @param {string} instr.mnemonic - the 3-letter mnemonic for the instruction, such as 'JMP'
+     * @param {Byte} instr.opCode - the operation code for the instruction
+     * @param {string}  instr.description - a human-readable description of the instruction
+     * @param {instructionImplementation} instr.implementation - the implementation of the instruction
+     * @param {AddressMode} instr.addressMode - the address mode
+     */
+    constructor({mnemonic, opCode, description, implementation, addressMode = AddressModes.implied}) {
         this.mnemonic = mnemonic;
         this.opCode = opCode;
         this.description = description;
         this.implementation = implementation;
         this.addressMode = addressMode;
-        this.cycles = cycles;
     }
 
-    execute(processor) {
-        this.implementation(processor);
+    /**
+     * Executes the instruction on a processor
+     * @param {MCS6502} processor - the processor on which to execute the instruction
+     * @param {(Byte|Address)=} operand - the argument to the instruction
+     * @returns {Number} - the number of cycles spent executing the instruction
+     */
+    execute(processor, operand) {
+        return this.implementation(processor, operand);
     }
 
+    /**
+     * Disassembles the instruction for an address and operand
+     * @param {Address} address - the address at which the instruction is located
+     * @param {(Address|Byte)} operand - the operand for the instruction
+     * @returns {string} - the disassembled instruction in the form Address Mnemonic Operand
+     */
     disassemble(address, operand) {
         return `${address.toString(16).toUpperCase()} ${this.mnemonic} ${this.addressMode.disassemble(operand)}`;
     }
 }
+
+// Here be dragons...
 
 class BRK extends Instruction {
     constructor() {
