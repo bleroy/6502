@@ -5,15 +5,21 @@
  * It's possible to add to and remove functions from the delegate.
  * @param {Array} array - a list of functions to execute sequentially. Optional.
  */
-export let delegate = (array = []) => {
+export let delegate = (...array) => {
     let result = (...args) => {
-        array.forEach(h => h.apply(null, args));
+        array.forEach(h => {
+            if (result.filter(h.param)) h(...args);
+        });
     };
     /**
      * Adds a function to the delegate.
      * @param {Function} fun - the function to add.
+     * @param {Object} param - an optional parameter that the filter function can use
+     * to filter out functions. For instance, a breakpoint can use an address on its
+     * parameter object.
      */
-    result.add = fun => {
+    result.add = (fun, param = null) => {
+        fun.param = param;
         array.push(fun);
     }
     /**
@@ -24,6 +30,12 @@ export let delegate = (array = []) => {
         let i = array.indexOf(fun);
         if (i !== -1) array.splice(i, 1);
     };
+    /**
+     * A filter function can be added to a delegate so that not all handlers are executed
+     * every time. By default, the filter always returns true.
+     * @param {Object} param 
+     */
+    result.filter = (param) => true;
     return result;
 };
 
@@ -434,7 +446,12 @@ export default class MCS6502 {
         this[aHandlersSymbol] = delegate();
         this[xHandlersSymbol] = delegate();
         this[yHandlersSymbol] = delegate();
-        this[breakpointsSymbol] = delegate();
+        let breakpoints = delegate();
+        breakpoints.filter = (param) => {
+            let predicate = param.predicate || (() => true);
+            return ((!param.address || this.pc === param.address) && predicate(param));
+        };
+        this[breakpointsSymbol] = breakpoints;
     }
 
     static get instructionSet() {
@@ -456,7 +473,7 @@ export default class MCS6502 {
         this[aHandlersSymbol].call(value);
     }
     addAChange(handler) {
-        this[aHandlersSymbol].push(handler);
+        this[aHandlersSymbol].add(handler);
     }
     removeAChange(handler) {
         this[aHandlersSymbol].remove(handler);
@@ -470,7 +487,7 @@ export default class MCS6502 {
         this[xHandlersSymbol].call(value);
     }
     addXChange(handler) {
-        this[xHandlersSymbol].push(handler);
+        this[xHandlersSymbol].add(handler);
     }
     removeXChange(handler) {
         this[xHandlersSymbol].remove(handler);
@@ -484,7 +501,7 @@ export default class MCS6502 {
         this[yHandlersSymbol].call(value);
     }
     addYChange(handler) {
-        this[yHandlersSymbol].push(handler);
+        this[yHandlersSymbol].add(handler);
     }
     removeYChange(handler) {
         this[yHandlersSymbol].remove(handler);
@@ -497,20 +514,21 @@ export default class MCS6502 {
         this[pcSymbol] = value;
         this[breakpointsSymbol].call(this);
     }
-    addAddressBreakpoint(address, handler) {
-        this[breakpointsSymbol].push(proc => {
-            if (proc.PC == address) handler(proc);
-        });
+    addBreakpoint(address, predicate, handler) {
+        this[breakpointsSymbol].add(handler, {address, predicate});
     }
-    // TODO: add remove that works, other kinds of breakpoints.
-    // Also, move all handlers to really be breakpoints with different traps.
+    addAddressBreakpoint(address, handler) {
+        this[breakpointsSymbol].add(handler, {address});
+    }
+    addConditionalBreakpoint(predicate, handler) {
+        this[breakpointsSymbol].add(handler, {predicate});
+    }
 
     get SR() {
         return this[srSymbol];
     }
     set SR(value) {
         this[srSymbol] = value;
-        // TODO: call breakpoints
     }
 
     addressAt(pointer, zeroPage = false) {
@@ -522,7 +540,16 @@ export default class MCS6502 {
     }
     poke(address, value) {
         this[memorySymbol][address.valueOf()] = value;
-        // TODO: add event handlers
+    }
+
+    step() {
+        let opCode = this.peek(this.PC);
+        let instruction = MCS6502.instructionSet[opCode];
+        let operand = instruction.bytes == 0 ? null
+        : instruction.bytes == 1 ? this.peek(this.PC + 1)
+        : this.peek(this.PC + 1) + 256 * this.peek(this.PC + 2);
+        instruction.implementation(this, operand);
+        this.PC += 1 + instruction.bytes;
     }
 
     // TODO
