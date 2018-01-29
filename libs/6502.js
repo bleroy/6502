@@ -344,22 +344,6 @@ export class Instruction {
 
 // Here be dragons...
 
-class BRK extends Instruction {
-    constructor() {
-        super({
-            opCode: 0x00,
-            addressMode: null,
-            mnemonic: 'BRK',
-            description: 'Force break',
-            implementation: (processor) => {
-                processor.push(processor.PC + 2);
-                processor.push(processor.SR);
-                processor.interrupt();
-            }
-        });
-    }
-}
-
 class ADC extends Instruction {
     constructor({opCode, addressMode}) {
         super({
@@ -379,6 +363,51 @@ class ADC extends Instruction {
     }
 }
 
+class AND extends Instruction {}
+class ASL extends Instruction {}
+class BCC extends Instruction {}
+class BCS extends Instruction {}
+class BEQ extends Instruction {}
+class BIT extends Instruction {}
+class BMI extends Instruction {}
+class BNE extends Instruction {}
+class BPL extends Instruction {}
+
+class BRK extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x00,
+            addressMode: null,
+            mnemonic: 'BRK',
+            description: 'Force break',
+            implementation: (processor) => {
+                processor.push(processor.PC + 2);
+                processor.push(processor.SR);
+                processor.interrupt();
+            }
+        });
+    }
+}
+
+class BVC extends Instruction {}
+class BVS extends Instruction {}
+class CLC extends Instruction {}
+class CLD extends Instruction {}
+class CLI extends Instruction {}
+class CLV extends Instruction {}
+class CMP extends Instruction {}
+class CPX extends Instruction {}
+class CPY extends Instruction {}
+class DEC extends Instruction {}
+class DEX extends Instruction {}
+class DEY extends Instruction {}
+class EOR extends Instruction {}
+class INC extends Instruction {}
+class INX extends Instruction {}
+class INY extends Instruction {}
+class JMP extends Instruction {}
+class JSR extends Instruction {}
+
 class LDA extends Instruction {
     constructor({opCode, addressMode}) {
         super({
@@ -395,6 +424,24 @@ class LDA extends Instruction {
     }
 }
 
+class LDX extends Instruction {}
+class LDY extends Instruction {}
+class LSR extends Instruction {}
+class NOP extends Instruction {}
+class ORA extends Instruction {}
+class PHA extends Instruction {}
+class PHP extends Instruction {}
+class PLA extends Instruction {}
+class PLP extends Instruction {}
+class ROL extends Instruction {}
+class ROR extends Instruction {}
+class RTI extends Instruction {}
+class RTS extends Instruction {}
+class SBC extends Instruction {}
+class SEC extends Instruction {}
+class SED extends Instruction {}
+class SEI extends Instruction {}
+
 class STA extends Instruction {
     constructor({opCode, addressMode}) {
         super({
@@ -407,6 +454,14 @@ class STA extends Instruction {
         });
     }
 }
+class STX extends Instruction {}
+class STY extends Instruction {}
+class TAX extends Instruction {}
+class TAY extends Instruction {}
+class TSX extends Instruction {}
+class TXA extends Instruction {}
+class TXS extends Instruction {}
+class TYA extends Instruction {}
 
 class InvalidInstruction extends Instruction {
     constructor(opCode) {
@@ -421,6 +476,7 @@ class InvalidInstruction extends Instruction {
         });
     }
 }
+let NoInstruction = new InvalidInstruction();
 
 let aSymbol = Symbol('a'), xSymbol = Symbol('x'), ySymbol = Symbol('y'),
     spSymbol = Symbol('sp'), pcSymbol = Symbol('pc'), srSymbol = ('sr'),
@@ -456,8 +512,89 @@ export default class MCS6502 {
 
     static get instructionSet() {
         return [
-            /* 00 */ new BRK(),
-            /* 01 */ 
+            new BRK({opCode: 0x00, addressMode: AddressModes.implied}),
+            new ORA({opCode: 0x01, addressMode: AddressModes.Xind}),
+            NoInstruction, NoInstruction, NoInstruction,
+            new ORA({opCode: 0x05, addressMode: AddressModes.zpg}),
+            new ASL({opCode: 0x06, addressMode: AddressModes.zpg}),
+            NoInstruction,
+            new PHP({opCode: 0x08, addressMode: AddressModes.implied}),
+            new ORA({opCode: 0x09, addressMode: AddressModes.immediate}),
+            new ASL({opCode: 0x0A, addressMode: AddressModes.A}),
+            NoInstruction, NoInstruction,
+            new ORA({opCode: 0x0D, addressMode: AddressModes.abs}),
+            new ASL({opCode: 0x0E, addressMode: AddressModes.abs}),
+            NoInstruction,
+            new BPL({opCode: 0x10, addressMode: AddressModes.rel}),
+            new ORA({opCode: 0x11, addressMode: AddressModes.indY}),
+            NoInstruction, NoInstruction, NoInstruction,
+            new ORA({opCode: 0x15, addressMode: AddressModes.zpgX}),
+            new ASL({opCode: 0x16, addressMode: AddressModes.zpgX}),
+            NoInstruction,
+            new CLC({opCode: 0x18, addressMode: AddressModes.implied}),
+            new ORA({opCode: 0x19, addressMode: AddressModes.absY}),
+            NoInstruction, NoInstruction, NoInstruction,
+            new ORA({opCode: 0x1D, addressMode: AddressModes.absX}),
+            new ASL({opCode: 0x1E, addressMode: AddressModes.absX}),
+            NoInstruction,
+            new JSR({opCode: 0x20, addressMode: AddressModes.abs}),
+            new AND({opCode: 0x21, addressMode: AddressModes.Xind}),
+            NoInstruction, NoInstruction,
+            new BIT({opCode: 0x24, addressMode: AddressModes.zeroPage}),
+            new AND({opCode: 0x25, addressMode: AddressModes.zeroPage}),
+            new ROL({opCode: 0x26, addressMode: AddressModes.zeroPage}),
+            NoInstruction,
+            new PLP({opCode: 0x28, addressMode: AddressModes.implied}),
+            new AND({opCode: 0x29, addressMode: AddressModes.immediate}),
+            new ROL({opCode: 0x2A, addressMode: AddressModes.A}),
+            NoInstruction,
+            new BIT({opCode: 0x2C, addressMode: AddressModes.abs}),
+            new AND({opCode: 0x2D, addressMode: AddressModes.abs}),
+            new ROL({opCode: 0x2E, addressMode: AddressModes.abs}),
+            NoInstruction,
+            new BMI({opCode: 0x30, addressMode: AddressModes.rel}),
+            new AND({opCode: 0x31, addressMode: AddressModes.indY}),
+            NoInstruction, NoInstruction, NoInstruction,
+            new AND({opCode: 0x35, addressMode: AddressModes.zpgX}),
+            new ROL({opCode: 0x36, addressMode: AddressModes.zpgX}),
+            NoInstruction,
+            new SEC({opCode: 0x38, addressMode: AddressModes.implied}),
+            new AND({opCode: 0x39, addressMode: AddressModes.absY}),
+            NoInstruction, NoInstruction, NoInstruction,
+            new AND({opCode: 0x3D, addressMode: AddressModes.absX}),
+            new ROL({opCode: 0x3E, addressMode: AddressModes.absX}),
+            NoInstruction,
+            new RTI({opCode: 0x40, addressMode: AddressModes.implied}),
+            new EOR({opCode: 0x41, addressMode: AddressModes.Xind}),
+            NoInstruction, NoInstruction, NoInstruction,
+            new EOR({opCode: 0x45, addressMode: AddressModes.zpg}),
+            new LSR({opCode: 0x46, addressMode: AddressModes.zpg}),
+            NoInstruction,
+            new PHA({opCode: 0x48, addressMode: AddressModes.implied}),
+            new EOR({opCode: 0x49, addressMode: AddressModes.immediate}),
+            new LSR({opCode: 0x4A, addressMode: AddressModes.A}),
+            NoInstruction,
+            new JMP({opCode: 0x4C, addressMode: AddressModes.abs}),
+            new EOR({opCode: 0x4D, addressMode: AddressModes.abs}),
+            new LSR({opCode: 0x4E, addressMode: AddressModes.abs}),
+            NoInstruction,
+            new BVC({opCode: 0x50, addressMode: AddressModes.rel}),
+            new EOR({opCode: 0x51, addressMode: AddressModes.indY}),
+            NoInstruction, NoInstruction, NoInstruction,
+            new EOR({opCode: 0x55, addressMode: AddressModes.zpgX}),
+            new LSR({opCode: 0x56, addressMode: AddressModes.zpgX}),
+            NoInstruction,
+            new CLI({opCode: 0x58, addressMode: AddressModes.implied}),
+            new EOR({opCode: 0x59, addressMode: AddressModes.absY}),
+            NoInstruction, NoInstruction, NoInstruction,
+            new EOR({opCode: 0x5D, addressMode: AddressModes.absX}),
+            new LSR({opCode: 0x5E, addressMode: AddressModes.absX}),
+            NoInstruction,
+            new RTS({opCode: 0x60, addressMode: AddressModes.implied}),
+            new ADC({opCode: 0x61, addressMode: AddressModes.Xind}),
+            NoInstruction, NoInstruction, NoInstruction,
+            new ADC({opCode: 0x65, addressMode: AddressModes.zpg}),
+            new ROR({opCode: 0x66, addressMode: AddressModes.zpg}),
         ];
     }
 
