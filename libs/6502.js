@@ -338,11 +338,33 @@ export class Instruction {
      * @returns {string} - the disassembled instruction in the form Address Mnemonic Operand
      */
     disassemble(address, operand) {
-        return `${address.toString(16).toUpperCase()} ${this.mnemonic} ${this.addressMode.disassemble(operand)}`;
+        return `${address.toString(16).toUpperCase().padStart(4, '0')} ${this.mnemonic} ${this.addressMode.disassemble(operand)}`.trim();
     }
 }
 
 // Here be dragons...
+/**
+ * An iterator that disassembles memory one instruction at a time.
+ * @param {MCS6502} processor The processor
+ * @param {Address} address The address at which to start disassembling memory
+ */
+export function* disassemble (processor, address) {
+    while (address < 0xFFFF) {
+        let opCode = processor.peek(address);
+        let instruction = processor.instructionSet[opCode];
+        if (!instruction || instruction instanceof InvalidInstruction) {
+            yield `${new Address(address).toString()} *** # Unknown opCode ${new Byte(opCode).toString()}`;
+            continue;
+        }
+        let addressMode = instruction.addressMode;
+        let operand = 
+            addressMode.bytes == 0 ? null :
+            addressMode.bytes == 1 ? processor.peek(address + 1) :
+            processor.peek(address + 1) + 256 * processor.peek(address + 2);
+        yield instruction.disassemble(address, operand);
+        address += 1 + addressMode.bytes;
+    }
+}
 
 class ADC extends Instruction {
     constructor({opCode, addressMode}) {
@@ -476,6 +498,7 @@ class InvalidInstruction extends Instruction {
         });
     }
 }
+
 let NoInstruction = new InvalidInstruction();
 
 let aSymbol = Symbol('a'), xSymbol = Symbol('x'), ySymbol = Symbol('y'),
@@ -507,11 +530,8 @@ export default class MCS6502 {
             let predicate = param.predicate || (() => true);
             return ((!param.address || this.pc === param.address) && predicate(param));
         };
-        this[breakpointsSymbol] = breakpoints;
-    }
-
-    static get instructionSet() {
-        return [
+        this[breakpointsSymbol] = breakpoints
+        this.instructionSet = [
             new BRK({opCode: 0x00, addressMode: AddressModes.implied}),
             new ORA({opCode: 0x01, addressMode: AddressModes.Xind}),
             NoInstruction, NoInstruction, NoInstruction,
@@ -814,7 +834,7 @@ export default class MCS6502 {
 
     step() {
         let opCode = this.peek(this.PC);
-        let instruction = MCS6502.instructionSet[opCode];
+        let instruction = this.instructionSet[opCode];
         let operand = instruction.bytes == 0 ? null
         : instruction.bytes == 1 ? this.peek(this.PC + 1)
         : this.peek(this.PC + 1) + 256 * this.peek(this.PC + 2);
