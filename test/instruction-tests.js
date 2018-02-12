@@ -49,8 +49,8 @@ describe('Instruction', () => {
             mnemonic: 'ABC',
             addressMode: AddressModes.indirect
         });
-        let disassembled = instruction.disassemble(0x1a34, 0x423F);
+        let disassembled = instruction.disassemble(0x423F);
 
-        disassembled.should.equal('1A34 ABC ($423F)');
+        disassembled.should.equal('ABC ($423F)');
     });
 });

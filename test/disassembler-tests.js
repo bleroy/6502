@@ -56,14 +56,14 @@ describe('Disassembler', () => {
 
         let gen = disassemble(processor, 0);
 
-        gen.next().value.should.equal("0000 CAT {nope}");
-        gen.next().value.should.equal("0001 CAT #$FF");
-        gen.next().value.should.equal("0003 CAT $1234");
-        gen.next().value.should.equal("0006 CAT #$3C");
-        gen.next().value.should.equal("0008 CAT {nope}");
-        gen.next().value.should.equal("0009 CAT {nope}");
-        gen.next().value.should.equal("000A CAT $5678");
-        gen.next().value.should.equal("000D CAT {nope}");
-        gen.next().value.should.equal("000E CAT #$6D");
+        gen.next().value.should.equal("0000 02       CAT {nope}");
+        gen.next().value.should.equal("0001 03 FF    CAT #$FF");
+        gen.next().value.should.equal("0003 04 34 12 CAT $1234");
+        gen.next().value.should.equal("0006 03 3C    CAT #$3C");
+        gen.next().value.should.equal("0008 02       CAT {nope}");
+        gen.next().value.should.equal("0009 02       CAT {nope}");
+        gen.next().value.should.equal("000A 04 78 56 CAT $5678");
+        gen.next().value.should.equal("000D 02       CAT {nope}");
+        gen.next().value.should.equal("000E 03 6D    CAT #$6D");
     });
 });

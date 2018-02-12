@@ -333,12 +333,11 @@ export class Instruction {
 
     /**
      * Disassembles the instruction for an address and operand
-     * @param {Address} address - the address at which the instruction is located
      * @param {(Address|Byte)} operand - the operand for the instruction
      * @returns {string} - the disassembled instruction in the form Address Mnemonic Operand
      */
-    disassemble(address, operand) {
-        return `${address.toString(16).toUpperCase().padStart(4, '0')} ${this.mnemonic} ${this.addressMode.disassemble(operand)}`.trim();
+    disassemble(operand) {
+        return `${this.mnemonic} ${this.addressMode.disassemble(operand)}`.trim();
     }
 }
 
@@ -361,7 +360,18 @@ export function* disassemble (processor, address) {
             addressMode.bytes == 0 ? null :
             addressMode.bytes == 1 ? processor.peek(address + 1) :
             processor.peek(address + 1) + 256 * processor.peek(address + 2);
-        yield instruction.disassemble(address, operand);
+        let memoryDump = (
+            address.toString(16).toUpperCase().padStart(4, '0') + ' ' +
+            opCode.toString(16).toUpperCase().padStart(2, '0') + ' ' +
+            (addressMode.bytes > 0 ?
+                processor.peek(address + 1).toString(16).toUpperCase().padStart(2, '0') + ' ' +
+                (addressMode.bytes > 1 ? 
+                    processor.peek(address + 2).toString(16).toUpperCase().padStart(2, '0') :
+                    ''
+                ): ''
+            )
+        ).padEnd(14, ' ');
+        yield memoryDump + instruction.disassemble(operand);
         address += 1 + addressMode.bytes;
     }
 }
