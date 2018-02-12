@@ -50,6 +50,7 @@ export class Address extends Number {
      * @param {Number} value - an integer between 0 and 65535.
      */
     constructor(value) {
+        value = value.valueOf();
         if (value > 65535 || value < 0 || !Number.isInteger(value)) {
             throw new RangeError(`Address value ${value} was out of the 0..65535 range.`);
         }
@@ -81,6 +82,7 @@ export class Byte extends Number {
      * @param {Number} value - an integer between -128 and 255.
      */
     constructor(value) {
+        value = value.valueOf();
         if (value > 255 || value < -128 || !Number.isInteger(value)) {
             throw new RangeError(`Byte value ${value} was out of the -128..255 range.`);
         }
@@ -519,7 +521,7 @@ let aSymbol = Symbol('a'), xSymbol = Symbol('x'), ySymbol = Symbol('y'),
 
 export default class MCS6502 {
     constructor({memory = new Uint8Array(65536), 
-        A = 0, X = 0, Y = 0, SP = 0, PC = 0, 
+        A = 0, X = 0, Y = 0, SP = 0xFF, PC = 0, 
         N = false, V = false, B = false, D = false, 
         I = false, Z = false, C = false} = {}) {
 
@@ -852,9 +854,15 @@ export default class MCS6502 {
         this.PC += 1 + instruction.bytes;
     }
 
-    // TODO
-    push(value) {}
-    pop() {}
+    push(value) {
+        this.poke(0x100 | this.SR, value);
+        this.SR = (this.SR - 1) & 0xFF;
+    }
+    pull() {
+        this.SR = (this.SR + 1) & 0xFF;
+        return new Byte(this.peek(0x100 | this.SR));
+    }
 
+    // TODO
     interrupt() {}
 }
