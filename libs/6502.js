@@ -1,5 +1,12 @@
 'use strict';
 
+// Symbols for private fields
+let aSymbol = Symbol('a'), xSymbol = Symbol('x'), ySymbol = Symbol('y'),
+    spSymbol = Symbol('sp'), pcSymbol = Symbol('pc'), srSymbol = ('sr'),
+    memorySymbol = Symbol('memory'), aHandlersSymbol = Symbol('aHandlers'),
+    xHandlersSymbol = Symbol('xHandlers'), yHandlersSymbol = Symbol('yHandlers'),
+    breakpointsSymbol = Symbol('breakpoints'), valueSymbol = Symbol('value');
+
 /**
  * Constructs a delegate, which is a list of functions that can be executed as one.
  * It's possible to add to and remove functions from the delegate.
@@ -38,8 +45,6 @@ export let delegate = (...array) => {
     result.filter = (param) => true;
     return result;
 };
-
-let valueSymbol = Symbol('value');
 
 /**
  * A Number type suitable for representing a 16-bit address.
@@ -112,6 +117,32 @@ export class Byte extends Number {
      */
     get value() {
         return this[valueSymbol] & 0xFF;
+    }
+}
+
+export class Ram {
+    /**
+     * Memory block for use with MCS6502
+     * @param {(Array | Uint8Array | Number)} bytes
+     * The array to store the memory in, or the number of bytes to reserve
+     */
+    constructor (bytes = new Uint8Array(65536)) {
+        this[memorySymbol] = 
+            bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    }
+
+    addressAt(pointer, zeroPage = false) {
+        return new Address(
+            this[memorySymbol][pointer]
+                + 256 * this[memorySymbol][(pointer + 1) & (zeroPage ? 0xFF : 0xFFFF)]
+            );
+    }
+
+    peek(address) {
+        return new Byte(this[memorySymbol][address.valueOf()]);
+    }
+    poke(address, value) {
+        this[memorySymbol][address.valueOf()] = value;
     }
 }
 
@@ -351,24 +382,24 @@ export class Instruction {
  */
 export function* disassemble (processor, address) {
     while (address < 0xFFFF) {
-        let opCode = processor.peek(address);
+        let opCode = processor.peek(address).value;
         let instruction = processor.instructionSet[opCode];
         if (!instruction || instruction instanceof InvalidInstruction) {
-            yield `${new Address(address).toString()} *** # Unknown opCode ${new Byte(opCode).toString()}`;
+            yield `${address.valueOf().toString(16).toUpperCase().padStart(4, '0')}          *** # Unknown opCode ${new Byte(opCode).toString()}`;
             continue;
         }
         let addressMode = instruction.addressMode;
         let operand = 
             addressMode.bytes == 0 ? null :
             addressMode.bytes == 1 ? processor.peek(address + 1) :
-            processor.peek(address + 1) + 256 * processor.peek(address + 2);
+            processor.addressAt(address + 1);
         let memoryDump = (
             address.toString(16).toUpperCase().padStart(4, '0') + ' ' +
             opCode.toString(16).toUpperCase().padStart(2, '0') + ' ' +
             (addressMode.bytes > 0 ?
-                processor.peek(address + 1).toString(16).toUpperCase().padStart(2, '0') + ' ' +
+                processor.peek(address + 1).value.toString(16).toUpperCase().padStart(2, '0') + ' ' +
                 (addressMode.bytes > 1 ? 
-                    processor.peek(address + 2).toString(16).toUpperCase().padStart(2, '0') :
+                    processor.peek(address + 2).value.toString(16).toUpperCase().padStart(2, '0') :
                     ''
                 ): ''
             )
@@ -513,17 +544,237 @@ class InvalidInstruction extends Instruction {
 
 let NoInstruction = new InvalidInstruction();
 
-let aSymbol = Symbol('a'), xSymbol = Symbol('x'), ySymbol = Symbol('y'),
-    spSymbol = Symbol('sp'), pcSymbol = Symbol('pc'), srSymbol = ('sr'),
-    memorySymbol = Symbol('memory'), aHandlersSymbol = Symbol('aHandlers'),
-    xHandlersSymbol = Symbol('xHandlers'), yHandlersSymbol = Symbol('yHandlers'),
-    breakpointsSymbol = Symbol('breakpoints');
+let mcs6502InstructionSet = [
+    new BRK({opCode: 0x00, addressMode: AddressModes.implied}),
+    new ORA({opCode: 0x01, addressMode: AddressModes.Xind}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new ORA({opCode: 0x05, addressMode: AddressModes.zpg}),
+    new ASL({opCode: 0x06, addressMode: AddressModes.zpg}),
+    NoInstruction,
+    new PHP({opCode: 0x08, addressMode: AddressModes.implied}),
+    new ORA({opCode: 0x09, addressMode: AddressModes.immediate}),
+    new ASL({opCode: 0x0A, addressMode: AddressModes.A}),
+    NoInstruction, NoInstruction,
+    new ORA({opCode: 0x0D, addressMode: AddressModes.abs}),
+    new ASL({opCode: 0x0E, addressMode: AddressModes.abs}),
+    NoInstruction,
+    new BPL({opCode: 0x10, addressMode: AddressModes.rel}),
+    new ORA({opCode: 0x11, addressMode: AddressModes.indY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new ORA({opCode: 0x15, addressMode: AddressModes.zpgX}),
+    new ASL({opCode: 0x16, addressMode: AddressModes.zpgX}),
+    NoInstruction,
+    new CLC({opCode: 0x18, addressMode: AddressModes.implied}),
+    new ORA({opCode: 0x19, addressMode: AddressModes.absY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new ORA({opCode: 0x1D, addressMode: AddressModes.absX}),
+    new ASL({opCode: 0x1E, addressMode: AddressModes.absX}),
+    NoInstruction,
+    new JSR({opCode: 0x20, addressMode: AddressModes.abs}),
+    new AND({opCode: 0x21, addressMode: AddressModes.Xind}),
+    NoInstruction, NoInstruction,
+    new BIT({opCode: 0x24, addressMode: AddressModes.zeroPage}),
+    new AND({opCode: 0x25, addressMode: AddressModes.zeroPage}),
+    new ROL({opCode: 0x26, addressMode: AddressModes.zeroPage}),
+    NoInstruction,
+    new PLP({opCode: 0x28, addressMode: AddressModes.implied}),
+    new AND({opCode: 0x29, addressMode: AddressModes.immediate}),
+    new ROL({opCode: 0x2A, addressMode: AddressModes.A}),
+    NoInstruction,
+    new BIT({opCode: 0x2C, addressMode: AddressModes.abs}),
+    new AND({opCode: 0x2D, addressMode: AddressModes.abs}),
+    new ROL({opCode: 0x2E, addressMode: AddressModes.abs}),
+    NoInstruction,
+    new BMI({opCode: 0x30, addressMode: AddressModes.rel}),
+    new AND({opCode: 0x31, addressMode: AddressModes.indY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new AND({opCode: 0x35, addressMode: AddressModes.zpgX}),
+    new ROL({opCode: 0x36, addressMode: AddressModes.zpgX}),
+    NoInstruction,
+    new SEC({opCode: 0x38, addressMode: AddressModes.implied}),
+    new AND({opCode: 0x39, addressMode: AddressModes.absY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new AND({opCode: 0x3D, addressMode: AddressModes.absX}),
+    new ROL({opCode: 0x3E, addressMode: AddressModes.absX}),
+    NoInstruction,
+    new RTI({opCode: 0x40, addressMode: AddressModes.implied}),
+    new EOR({opCode: 0x41, addressMode: AddressModes.Xind}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new EOR({opCode: 0x45, addressMode: AddressModes.zpg}),
+    new LSR({opCode: 0x46, addressMode: AddressModes.zpg}),
+    NoInstruction,
+    new PHA({opCode: 0x48, addressMode: AddressModes.implied}),
+    new EOR({opCode: 0x49, addressMode: AddressModes.immediate}),
+    new LSR({opCode: 0x4A, addressMode: AddressModes.A}),
+    NoInstruction,
+    new JMP({opCode: 0x4C, addressMode: AddressModes.abs}),
+    new EOR({opCode: 0x4D, addressMode: AddressModes.abs}),
+    new LSR({opCode: 0x4E, addressMode: AddressModes.abs}),
+    NoInstruction,
+    new BVC({opCode: 0x50, addressMode: AddressModes.rel}),
+    new EOR({opCode: 0x51, addressMode: AddressModes.indY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new EOR({opCode: 0x55, addressMode: AddressModes.zpgX}),
+    new LSR({opCode: 0x56, addressMode: AddressModes.zpgX}),
+    NoInstruction,
+    new CLI({opCode: 0x58, addressMode: AddressModes.implied}),
+    new EOR({opCode: 0x59, addressMode: AddressModes.absY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new EOR({opCode: 0x5D, addressMode: AddressModes.absX}),
+    new LSR({opCode: 0x5E, addressMode: AddressModes.absX}),
+    NoInstruction,
+    new RTS({opCode: 0x60, addressMode: AddressModes.implied}),
+    new ADC({opCode: 0x61, addressMode: AddressModes.Xind}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new ADC({opCode: 0x65, addressMode: AddressModes.zpg}),
+    new ROR({opCode: 0x66, addressMode: AddressModes.zpg}),
+    NoInstruction,
+    new PLA({opCode: 0x68, addressMode: AddressModes.implied}),
+    new ADC({opCode: 0x69, addressMode: AddressModes.immediate}),
+    new ROR({opCode: 0x6A, addressMode: AddressModes.A}),
+    NoInstruction,
+    new JMP({opCode: 0x6C, addressMode: AddressModes.indirect}),
+    new ADC({opCode: 0x6D, addressMode: AddressModes.abs}),
+    new ROR({opCode: 0x6E, addressMode: AddressModes.abs}),
+    NoInstruction,
+    new BVS({opCode: 0x70, addressMode: AddressModes.rel}),
+    new ADC({opCode: 0x71, addressMode: AddressModes.indY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new ADC({opCode: 0x75, addressMode: AddressModes.zpgX}),
+    new ROR({opCode: 0x76, addressMode: AddressModes.zpgX}),
+    NoInstruction,
+    new SEI({opCode: 0x78, addressMode: AddressModes.implied}),
+    new ADC({opCode: 0x79, addressMode: AddressModes.absY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new ADC({opCode: 0x7D, addressMode: AddressModes.absX}),
+    new ROR({opCode: 0x7E, addressMode: AddressModes.absX}),
+    NoInstruction, NoInstruction,
+    new STA({opCode: 0x81, addressMode: AddressModes.Xind}),
+    NoInstruction, NoInstruction,
+    new STY({opCode: 0x84, addressMode: AddressModes.zpg}),
+    new STA({opCode: 0x85, addressMode: AddressModes.zpg}),
+    new STX({opCode: 0x86, addressMode: AddressModes.zpg}),
+    NoInstruction,
+    new DEY({opCode: 0x88, addressMode: AddressModes.implied}),
+    NoInstruction,
+    new TXA({opCode: 0x8A, addressMode: AddressModes.implied}),
+    NoInstruction,
+    new STY({opCode: 0x8C, addressMode: AddressModes.abs}),
+    new STA({opCode: 0x8D, addressMode: AddressModes.abs}),
+    new STX({opCode: 0x8E, addressMode: AddressModes.abs}),
+    NoInstruction,
+    new BCC({opCode: 0x90, addressMode: AddressModes.rel}),
+    new STA({opCode: 0x91, addressMode: AddressModes.indY}),
+    NoInstruction, NoInstruction,
+    new STY({opCode: 0x94, addressMode: AddressModes.zpgX}),
+    new STA({opCode: 0x95, addressMode: AddressModes.zpgX}),
+    new STX({opCode: 0x96, addressMode: AddressModes.zpgY}),
+    NoInstruction,
+    new TYA({opCode: 0x98, addressMode: AddressModes.implied}),
+    new STA({opCode: 0x99, addressMode: AddressModes.absY}),
+    new TXS({opCode: 0x9A, addressMode: AddressModes.impl}),
+    NoInstruction, NoInstruction,
+    new STA({opCode: 0x9D, addressMode: AddressModes.absX}),
+    NoInstruction, NoInstruction,
+    new LDY({opCode: 0xA0, addressMode: AddressModes.immediate}),
+    new LDA({opCode: 0xA1, addressMode: AddressModes.Xind}),
+    new LDX({opCode: 0xA2, addressMode: AddressModes.immediate}),
+    NoInstruction,
+    new LDY({opCode: 0xA4, addressMode: AddressModes.zpg}),
+    new LDA({opCode: 0xA5, addressMode: AddressModes.zpg}),
+    new LDX({opCode: 0xA6, addressMode: AddressModes.zpg}),
+    NoInstruction,
+    new TAY({opCode: 0xA8, addressMode: AddressModes.implied}),
+    new LDA({opCode: 0xA9, addressMode: AddressModes.immediate}),
+    new TAX({opCode: 0xAA, addressMode: AddressModes.implied}),
+    NoInstruction,
+    new LDY({opCode: 0xAC, addressMode: AddressModes.abs}),
+    new LDA({opCode: 0xAD, addressMode: AddressModes.abs}),
+    new LDX({opCode: 0xAE, addressMode: AddressModes.abs}),
+    NoInstruction,
+    new BCS({opCode: 0xB0, addressMode: AddressModes.rel}),
+    new LDA({opCode: 0xB1, addressMode: AddressModes.indY}),
+    NoInstruction, NoInstruction,
+    new LDY({opCode: 0xB4, addressMode: AddressModes.zpgX}),
+    new LDA({opCode: 0xB5, addressMode: AddressModes.zpgX}),
+    new LDX({opCode: 0xB6, addressMode: AddressModes.zpgY}),
+    NoInstruction,
+    new CLV({opCode: 0xB8, addressMode: AddressModes.impl}),
+    new LDA({opCode: 0xB9, addressMode: AddressModes.absY}),
+    new TSX({opCode: 0xBA, addressMode: AddressModes.impl}),
+    NoInstruction,
+    new LDY({opCode: 0xBC, addressMode: AddressModes.absX}),
+    new LDA({opCode: 0xBD, addressMode: AddressModes.absX}),
+    new LDX({opCode: 0xBE, addressMode: AddressModes.absY}),
+    NoInstruction,
+    new CPY({opCode: 0xC0, addressMode: AddressModes.immediate}),
+    new CMP({opCode: 0xC1, addressMode: AddressModes.Xind}),
+    NoInstruction, NoInstruction,
+    new CPY({opCode: 0xC4, addressMode: AddressModes.zpg}),
+    new CMP({opCode: 0xC5, addressMode: AddressModes.zpg}),
+    new DEC({opCode: 0xC6, addressMode: AddressModes.zpg}),
+    NoInstruction,
+    new INY({opCode: 0xC8, addressMode: AddressModes.implied}),
+    new CMP({opCode: 0xC9, addressMode: AddressModes.immediate}),
+    new DEX({opCode: 0xCA, addressMode: AddressModes.implied}),
+    NoInstruction,
+    new CPY({opCode: 0xCC, addressMode: AddressModes.abs}),
+    new CMP({opCode: 0xCD, addressMode: AddressModes.abs}),
+    new DEC({opCode: 0xCE, addressMode: AddressModes.abs}),
+    NoInstruction,
+    new BNE({opCode: 0xD0, addressMode: AddressModes.rel}),
+    new CMP({opCode: 0xD1, addressMode: AddressModes.indY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new CMP({opCode: 0xD5, addressMode: AddressModes.zpgX}),
+    new DEC({opCode: 0xD6, addressMode: AddressModes.zpgX}),
+    NoInstruction,
+    new CLD({opCode: 0xD8, addressMode: AddressModes.implied}),
+    new CMP({opCode: 0xD9, addressMode: AddressModes.absY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new CMP({opCode: 0xDD, addressMode: AddressModes.absX}),
+    new DEC({opCode: 0xDE, addressMode: AddressModes.absX}),
+    NoInstruction,
+    new CPX({opCode: 0xE0, addressMode: AddressModes.immediate}),
+    new SBC({opCode: 0xE1, addressMode: AddressModes.Xind}),
+    NoInstruction, NoInstruction,
+    new CPX({opCode: 0xE4, addressMode: AddressModes.zpg}),
+    new SBC({opCode: 0xE5, addressMode: AddressModes.zpg}),
+    new INC({opCode: 0xE6, addressMode: AddressModes.zpg}),
+    NoInstruction,
+    new INX({opCode: 0xE8, addressMode: AddressModes.impl}),
+    new SBC({opCode: 0xE9, addressMode: AddressModes.immediate}),
+    new NOP({opCode: 0xEA, addressMode: AddressModes.implied}),
+    NoInstruction,
+    new CPX({opCode: 0xEC, addressMode: AddressModes.abs}),
+    new SBC({opCode: 0xED, addressMode: AddressModes.abs}),
+    new INC({opCode: 0xEE, addressMode: AddressModes.abs}),
+    NoInstruction,
+    new BEQ({opCode: 0xF0, addressMode: AddressModes.rel}),
+    new SBC({opCode: 0xF1, addressMode: AddressModes.indY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new SBC({opCode: 0xF5, addressMode: AddressModes.zpgX}),
+    new INC({opCode: 0xF6, addressMode: AddressModes.zpgX}),
+    NoInstruction,
+    new SED({opCode: 0xF8, addressMode: AddressModes.impl}),
+    new SBC({opCode: 0xF9, addressMode: AddressModes.absY}),
+    NoInstruction, NoInstruction, NoInstruction,
+    new SBC({opCode: 0xFD, addressMode: AddressModes.absX}),
+    new INC({opCode: 0xFE, addressMode: AddressModes.absX}),
+    NoInstruction
+];
 
 export default class MCS6502 {
-    constructor({memory = new Uint8Array(65536), 
+    /**
+     * Build a new 6502 processor
+     * @param {object} settings 
+     */
+    constructor({
+        memory = new Ram(), 
         A = 0, X = 0, Y = 0, SP = 0xFF, PC = 0, 
         N = false, V = false, B = false, D = false, 
-        I = false, Z = false, C = false} = {}) {
+        I = false, Z = false, C = false,
+        instructionSet = mcs6502InstructionSet
+    } = {}) {
 
         this[memorySymbol] = memory;
         this[aSymbol] = A;
@@ -543,224 +794,7 @@ export default class MCS6502 {
             return ((!param.address || this.pc === param.address) && predicate(param));
         };
         this[breakpointsSymbol] = breakpoints
-        this.instructionSet = [
-            new BRK({opCode: 0x00, addressMode: AddressModes.implied}),
-            new ORA({opCode: 0x01, addressMode: AddressModes.Xind}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new ORA({opCode: 0x05, addressMode: AddressModes.zpg}),
-            new ASL({opCode: 0x06, addressMode: AddressModes.zpg}),
-            NoInstruction,
-            new PHP({opCode: 0x08, addressMode: AddressModes.implied}),
-            new ORA({opCode: 0x09, addressMode: AddressModes.immediate}),
-            new ASL({opCode: 0x0A, addressMode: AddressModes.A}),
-            NoInstruction, NoInstruction,
-            new ORA({opCode: 0x0D, addressMode: AddressModes.abs}),
-            new ASL({opCode: 0x0E, addressMode: AddressModes.abs}),
-            NoInstruction,
-            new BPL({opCode: 0x10, addressMode: AddressModes.rel}),
-            new ORA({opCode: 0x11, addressMode: AddressModes.indY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new ORA({opCode: 0x15, addressMode: AddressModes.zpgX}),
-            new ASL({opCode: 0x16, addressMode: AddressModes.zpgX}),
-            NoInstruction,
-            new CLC({opCode: 0x18, addressMode: AddressModes.implied}),
-            new ORA({opCode: 0x19, addressMode: AddressModes.absY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new ORA({opCode: 0x1D, addressMode: AddressModes.absX}),
-            new ASL({opCode: 0x1E, addressMode: AddressModes.absX}),
-            NoInstruction,
-            new JSR({opCode: 0x20, addressMode: AddressModes.abs}),
-            new AND({opCode: 0x21, addressMode: AddressModes.Xind}),
-            NoInstruction, NoInstruction,
-            new BIT({opCode: 0x24, addressMode: AddressModes.zeroPage}),
-            new AND({opCode: 0x25, addressMode: AddressModes.zeroPage}),
-            new ROL({opCode: 0x26, addressMode: AddressModes.zeroPage}),
-            NoInstruction,
-            new PLP({opCode: 0x28, addressMode: AddressModes.implied}),
-            new AND({opCode: 0x29, addressMode: AddressModes.immediate}),
-            new ROL({opCode: 0x2A, addressMode: AddressModes.A}),
-            NoInstruction,
-            new BIT({opCode: 0x2C, addressMode: AddressModes.abs}),
-            new AND({opCode: 0x2D, addressMode: AddressModes.abs}),
-            new ROL({opCode: 0x2E, addressMode: AddressModes.abs}),
-            NoInstruction,
-            new BMI({opCode: 0x30, addressMode: AddressModes.rel}),
-            new AND({opCode: 0x31, addressMode: AddressModes.indY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new AND({opCode: 0x35, addressMode: AddressModes.zpgX}),
-            new ROL({opCode: 0x36, addressMode: AddressModes.zpgX}),
-            NoInstruction,
-            new SEC({opCode: 0x38, addressMode: AddressModes.implied}),
-            new AND({opCode: 0x39, addressMode: AddressModes.absY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new AND({opCode: 0x3D, addressMode: AddressModes.absX}),
-            new ROL({opCode: 0x3E, addressMode: AddressModes.absX}),
-            NoInstruction,
-            new RTI({opCode: 0x40, addressMode: AddressModes.implied}),
-            new EOR({opCode: 0x41, addressMode: AddressModes.Xind}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new EOR({opCode: 0x45, addressMode: AddressModes.zpg}),
-            new LSR({opCode: 0x46, addressMode: AddressModes.zpg}),
-            NoInstruction,
-            new PHA({opCode: 0x48, addressMode: AddressModes.implied}),
-            new EOR({opCode: 0x49, addressMode: AddressModes.immediate}),
-            new LSR({opCode: 0x4A, addressMode: AddressModes.A}),
-            NoInstruction,
-            new JMP({opCode: 0x4C, addressMode: AddressModes.abs}),
-            new EOR({opCode: 0x4D, addressMode: AddressModes.abs}),
-            new LSR({opCode: 0x4E, addressMode: AddressModes.abs}),
-            NoInstruction,
-            new BVC({opCode: 0x50, addressMode: AddressModes.rel}),
-            new EOR({opCode: 0x51, addressMode: AddressModes.indY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new EOR({opCode: 0x55, addressMode: AddressModes.zpgX}),
-            new LSR({opCode: 0x56, addressMode: AddressModes.zpgX}),
-            NoInstruction,
-            new CLI({opCode: 0x58, addressMode: AddressModes.implied}),
-            new EOR({opCode: 0x59, addressMode: AddressModes.absY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new EOR({opCode: 0x5D, addressMode: AddressModes.absX}),
-            new LSR({opCode: 0x5E, addressMode: AddressModes.absX}),
-            NoInstruction,
-            new RTS({opCode: 0x60, addressMode: AddressModes.implied}),
-            new ADC({opCode: 0x61, addressMode: AddressModes.Xind}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new ADC({opCode: 0x65, addressMode: AddressModes.zpg}),
-            new ROR({opCode: 0x66, addressMode: AddressModes.zpg}),
-            NoInstruction,
-            new PLA({opCode: 0x68, addressMode: AddressModes.implied}),
-            new ADC({opCode: 0x69, addressMode: AddressModes.immediate}),
-            new ROR({opCode: 0x6A, addressMode: AddressModes.A}),
-            NoInstruction,
-            new JMP({opCode: 0x6C, addressMode: AddressModes.indirect}),
-            new ADC({opCode: 0x6D, addressMode: AddressModes.abs}),
-            new ROR({opCode: 0x6E, addressMode: AddressModes.abs}),
-            NoInstruction,
-            new BVS({opCode: 0x70, addressMode: AddressModes.rel}),
-            new ADC({opCode: 0x71, addressMode: AddressModes.indY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new ADC({opCode: 0x75, addressMode: AddressModes.zpgX}),
-            new ROR({opCode: 0x76, addressMode: AddressModes.zpgX}),
-            NoInstruction,
-            new SEI({opCode: 0x78, addressMode: AddressModes.implied}),
-            new ADC({opCode: 0x79, addressMode: AddressModes.absY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new ADC({opCode: 0x7D, addressMode: AddressModes.absX}),
-            new ROR({opCode: 0x7E, addressMode: AddressModes.absX}),
-            NoInstruction, NoInstruction,
-            new STA({opCode: 0x81, addressMode: AddressModes.Xind}),
-            NoInstruction, NoInstruction,
-            new STY({opCode: 0x84, addressMode: AddressModes.zpg}),
-            new STA({opCode: 0x85, addressMode: AddressModes.zpg}),
-            new STX({opCode: 0x86, addressMode: AddressModes.zpg}),
-            NoInstruction,
-            new DEY({opCode: 0x88, addressMode: AddressModes.implied}),
-            NoInstruction,
-            new TXA({opCode: 0x8A, addressMode: AddressModes.implied}),
-            NoInstruction,
-            new STY({opCode: 0x8C, addressMode: AddressModes.abs}),
-            new STA({opCode: 0x8D, addressMode: AddressModes.abs}),
-            new STX({opCode: 0x8E, addressMode: AddressModes.abs}),
-            NoInstruction,
-            new BCC({opCode: 0x90, addressMode: AddressModes.rel}),
-            new STA({opCode: 0x91, addressMode: AddressModes.indY}),
-            NoInstruction, NoInstruction,
-            new STY({opCode: 0x94, addressMode: AddressModes.zpgX}),
-            new STA({opCode: 0x95, addressMode: AddressModes.zpgX}),
-            new STX({opCode: 0x96, addressMode: AddressModes.zpgY}),
-            NoInstruction,
-            new TYA({opCode: 0x98, addressMode: AddressModes.implied}),
-            new STA({opCode: 0x99, addressMode: AddressModes.absY}),
-            new TXS({opCode: 0x9A, addressMode: AddressModes.impl}),
-            NoInstruction, NoInstruction,
-            new STA({opCode: 0x9D, addressMode: AddressModes.absX}),
-            NoInstruction, NoInstruction,
-            new LDY({opCode: 0xA0, addressMode: AddressModes.immediate}),
-            new LDA({opCode: 0xA1, addressMode: AddressModes.Xind}),
-            new LDX({opCode: 0xA2, addressMode: AddressModes.immediate}),
-            NoInstruction,
-            new LDY({opCode: 0xA4, addressMode: AddressModes.zpg}),
-            new LDA({opCode: 0xA5, addressMode: AddressModes.zpg}),
-            new LDX({opCode: 0xA6, addressMode: AddressModes.zpg}),
-            NoInstruction,
-            new TAY({opCode: 0xA8, addressMode: AddressModes.implied}),
-            new LDA({opCode: 0xA9, addressMode: AddressModes.immediate}),
-            new TAX({opCode: 0xAA, addressMode: AddressModes.implied}),
-            NoInstruction,
-            new LDY({opCode: 0xAC, addressMode: AddressModes.abs}),
-            new LDA({opCode: 0xAD, addressMode: AddressModes.abs}),
-            new LDX({opCode: 0xAE, addressMode: AddressModes.abs}),
-            NoInstruction,
-            new BCS({opCode: 0xB0, addressMode: AddressModes.rel}),
-            new LDA({opCode: 0xB1, addressMode: AddressModes.indY}),
-            NoInstruction, NoInstruction,
-            new LDY({opCode: 0xB4, addressMode: AddressModes.zpgX}),
-            new LDA({opCode: 0xB5, addressMode: AddressModes.zpgX}),
-            new LDX({opCode: 0xB6, addressMode: AddressModes.zpgY}),
-            NoInstruction,
-            new CLV({opCode: 0xB8, addressMode: AddressModes.impl}),
-            new LDA({opCode: 0xB9, addressMode: AddressModes.absY}),
-            new TSX({opCode: 0xBA, addressMode: AddressModes.impl}),
-            NoInstruction,
-            new LDY({opCode: 0xBC, addressMode: AddressModes.absX}),
-            new LDA({opCode: 0xBD, addressMode: AddressModes.absX}),
-            new LDX({opCode: 0xBE, addressMode: AddressModes.absY}),
-            NoInstruction,
-            new CPY({opCode: 0xC0, addressMode: AddressModes.immediate}),
-            new CMP({opCode: 0xC1, addressMode: AddressModes.Xind}),
-            NoInstruction, NoInstruction,
-            new CPY({opCode: 0xC4, addressMode: AddressModes.zpg}),
-            new CMP({opCode: 0xC5, addressMode: AddressModes.zpg}),
-            new DEC({opCode: 0xC6, addressMode: AddressModes.zpg}),
-            NoInstruction,
-            new INY({opCode: 0xC8, addressMode: AddressModes.implied}),
-            new CMP({opCode: 0xC9, addressMode: AddressModes.immediate}),
-            new DEX({opCode: 0xCA, addressMode: AddressModes.implied}),
-            NoInstruction,
-            new CPY({opCode: 0xCC, addressMode: AddressModes.abs}),
-            new CMP({opCode: 0xCD, addressMode: AddressModes.abs}),
-            new DEC({opCode: 0xCE, addressMode: AddressModes.abs}),
-            NoInstruction,
-            new BNE({opCode: 0xD0, addressMode: AddressModes.rel}),
-            new CMP({opCode: 0xD1, addressMode: AddressModes.indY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new CMP({opCode: 0xD5, addressMode: AddressModes.zpgX}),
-            new DEC({opCode: 0xD6, addressMode: AddressModes.zpgX}),
-            NoInstruction,
-            new CLD({opCode: 0xD8, addressMode: AddressModes.implied}),
-            new CMP({opCode: 0xD9, addressMode: AddressModes.absY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new CMP({opCode: 0xDD, addressMode: AddressModes.absX}),
-            new DEC({opCode: 0xDE, addressMode: AddressModes.absX}),
-            NoInstruction,
-            new CPX({opCode: 0xE0, addressMode: AddressModes.immediate}),
-            new SBC({opCode: 0xE1, addressMode: AddressModes.Xind}),
-            NoInstruction, NoInstruction,
-            new CPX({opCode: 0xE4, addressMode: AddressModes.zpg}),
-            new SBC({opCode: 0xE5, addressMode: AddressModes.zpg}),
-            new INC({opCode: 0xE6, addressMode: AddressModes.zpg}),
-            NoInstruction,
-            new INX({opCode: 0xE8, addressMode: AddressModes.impl}),
-            new SBC({opCode: 0xE9, addressMode: AddressModes.immediate}),
-            new NOP({opCode: 0xEA, addressMode: AddressModes.implied}),
-            NoInstruction,
-            new CPX({opCode: 0xEC, addressMode: AddressModes.abs}),
-            new SBC({opCode: 0xED, addressMode: AddressModes.abs}),
-            new INC({opCode: 0xEE, addressMode: AddressModes.abs}),
-            NoInstruction,
-            new BEQ({opCode: 0xF0, addressMode: AddressModes.rel}),
-            new SBC({opCode: 0xF1, addressMode: AddressModes.indY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new SBC({opCode: 0xF5, addressMode: AddressModes.zpgX}),
-            new INC({opCode: 0xF6, addressMode: AddressModes.zpgX}),
-            NoInstruction,
-            new SED({opCode: 0xF8, addressMode: AddressModes.impl}),
-            new SBC({opCode: 0xF9, addressMode: AddressModes.absY}),
-            NoInstruction, NoInstruction, NoInstruction,
-            new SBC({opCode: 0xFD, addressMode: AddressModes.absX}),
-            new INC({opCode: 0xFE, addressMode: AddressModes.absX}),
-            NoInstruction
-        ];
+        this.instructionSet = instructionSet;
     }
 
     get name() {
@@ -834,14 +868,14 @@ export default class MCS6502 {
     }
 
     addressAt(pointer, zeroPage = false) {
-        return this[memorySymbol][pointer] + 256 * this[memorySymbol][(pointer + 1) & (zeroPage ? 0xFF : 0xFFFF)];
+        return this[memorySymbol].addressAt(pointer, zeroPage);
     }
 
     peek(address) {
-        return new Byte(this[memorySymbol][address.valueOf()]);
+        return this[memorySymbol].peek(address);
     }
     poke(address, value) {
-        this[memorySymbol][address.valueOf()] = value;
+        this[memorySymbol].poke(address, value);
     }
 
     step() {
@@ -849,7 +883,7 @@ export default class MCS6502 {
         let instruction = this.instructionSet[opCode];
         let operand = instruction.bytes == 0 ? null
         : instruction.bytes == 1 ? this.peek(this.PC + 1)
-        : this.peek(this.PC + 1) + 256 * this.peek(this.PC + 2);
+        : this.addressAt(this.PC + 1);
         instruction.implementation(this, operand);
         this.PC += 1 + instruction.bytes;
     }

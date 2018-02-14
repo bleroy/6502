@@ -2,7 +2,7 @@ import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
 let should = chai.should();
 
-import MCS6502, { disassemble, Instruction, AddressMode, Address, Byte } from '../libs/6502';
+import MCS6502, { disassemble, Ram, Instruction, AddressMode, Address, Byte } from '../libs/6502';
 
 class CAT extends Instruction {
     constructor(opCode, addressMode) {
@@ -35,24 +35,24 @@ let CATno = new CAT(0x02, noOperandAddressMode);
 let CATbyte = new CAT(0x03, byteOperandAddressMode);
 let CATaddress = new CAT(0x04, addressOperandAddressMode);
 
-let processor = {
-    instructionSet: [null, null, CATno, CATbyte, CATaddress],
-    peek: address => processor.memory[address]
-}
+let instructionSet = [null, null, CATno, CATbyte, CATaddress];
 
 describe('Disassembler', () => {
     it("Disassembles all lengths of address modes", () => {
-        processor.memory = new Uint8Array([
-            0x02,
-            0x03, 0xFF,
-            0x04, 0x34, 0x12,
-            0x03, 0x3C,
-            0x02,
-            0x02,
-            0x04, 0x78, 0x56,
-            0x02,
-            0x03, 0x6D
-        ]);
+        let processor = new MCS6502({
+            instructionSet: instructionSet,
+            memory: new Ram([
+                0x02,
+                0x03, 0xFF,
+                0x04, 0x34, 0x12,
+                0x03, 0x3C,
+                0x02,
+                0x02,
+                0x04, 0x78, 0x56,
+                0x02,
+                0x03, 0x6D
+            ])
+        });
 
         let gen = disassemble(processor, 0);
 
