@@ -131,16 +131,33 @@ export class Ram {
             bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
     }
 
-    addressAt(pointer, zeroPage = false) {
+    /**
+     * Reads an address from memory.
+     * @param {Address} address The address in memory at which the address is stored
+     * in LSB-MSB foramt.
+     * @param {bool} zeroPage If the `zeroPage` flag is set, the address is
+     * read from 0-page memory, with wraparound behavior beyond address 0xFF.
+     */
+    addressAt(address, zeroPage = false) {
         return new Address(
-            this[memorySymbol][pointer]
-                + 256 * this[memorySymbol][(pointer + 1) & (zeroPage ? 0xFF : 0xFFFF)]
+            this[memorySymbol][address]
+                + 256 * this[memorySymbol][(address + 1) & (zeroPage ? 0xFF : 0xFFFF)]
             );
     }
 
+    /**
+     * Reads a byte from memory.
+     * @param {Address} address The address of the byte.
+     */
     peek(address) {
         return new Byte(this[memorySymbol][address.valueOf()]);
     }
+
+    /**
+     * Writes a byte to memory.
+     * @param {Address} address The adress where the byte must be written.
+     * @param {(Byte | Number)} value The value to write to memory. 
+     */
     poke(address, value) {
         this[memorySymbol][address.valueOf()] = value;
     }
