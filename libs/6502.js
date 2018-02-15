@@ -749,7 +749,7 @@ export default class MCS6502 {
      */
     constructor({
         memory = new Ram(), 
-        A = 0, X = 0, Y = 0, SP = 0xFF, PC = 0, 
+        A = 0, X = 0, Y = 0, SP = 0xFF, PC = 0x200, 
         N = false, V = false, B = false, D = false, 
         I = false, Z = false, C = false,
         instructionSet = mcs6502InstructionSet
@@ -839,6 +839,13 @@ export default class MCS6502 {
         this[breakpointsSymbol].add(handler, {predicate});
     }
 
+    get SP() {
+        return this[spSymbol];
+    }
+    set SP(value) {
+        this[spSymbol] = value;
+    }
+
     get SR() {
         return this[srSymbol];
     }
@@ -868,12 +875,12 @@ export default class MCS6502 {
     }
 
     push(value) {
-        this.poke(0x100 | this.SR, value);
-        this.SR = (this.SR - 1) & 0xFF;
+        this.poke(0x100 | this.SP, value);
+        this.SP = (this.SP - 1) & 0xFF;
     }
     pull() {
-        this.SR = (this.SR + 1) & 0xFF;
-        return new Byte(this.peek(0x100 | this.SR));
+        this.SP = (this.SP + 1) & 0xFF;
+        return new Byte(this.peek(0x100 | this.SP));
     }
 
     get instructionSet() { return this[instructionSetSymbol]; }
