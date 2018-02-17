@@ -742,6 +742,9 @@ let mcs6502InstructionSet = new InstructionSet(
     new INC({opCode: 0xFE, addressMode: AddressModes.absX})
 );
 
+/**
+ * A 6502 processor emulator
+ */
 export default class MCS6502 {
     /**
      * Build a new 6502 processor
@@ -761,7 +764,7 @@ export default class MCS6502 {
         this[ySymbol] = Y;
         this[spSymbol] = SP;
         this[pcSymbol] = PC;
-        this[srSymbol] = new Byte((N ? 0x80 : 0) | (V ? 0x40 : 0) | (B ? 0x10 : 0)
+        this[srSymbol] = new Byte(0x20 | (N ? 0x80 : 0) | (V ? 0x40 : 0) | (B ? 0x10 : 0)
             | (D ? 0x08 : 0) | (I ? 0x04 : 0) | (Z ? 0x02 : 0) | (C ? 0x01 : 0));
 
         this[aHandlersSymbol] = delegate();
@@ -776,10 +779,16 @@ export default class MCS6502 {
         this[instructionSetSymbol] = instructionSet;
     }
 
+    /**
+     * 6502
+     */
     get name() {
         return '6502';
     }
 
+    /**
+     * The 6502's accumulator register.
+     */
     get A() {
         return this[aSymbol];
     }
@@ -787,13 +796,24 @@ export default class MCS6502 {
         this[aSymbol] = value;
         this[aHandlersSymbol].call(value);
     }
+    /**
+     * Adds a change handler for changes of the A register.
+     * @param {Function} handler A change handler that gets called with the new value of A.
+     */
     addAChange(handler) {
         this[aHandlersSymbol].add(handler);
     }
+    /**
+     * Removes a handler from change notifications on the A register.
+     * @param {Function} handler The handler to remove
+     */
     removeAChange(handler) {
         this[aHandlersSymbol].remove(handler);
     }
 
+    /**
+     * The 6502's X register
+     */
     get X() {
         return this[xSymbol];
     }
@@ -801,9 +821,17 @@ export default class MCS6502 {
         this[xSymbol] = value;
         this[xHandlersSymbol].call(value);
     }
+    /**
+     * Adds a change handler for changes of the X register.
+     * @param {Function} handler A change handler that gets called with the new value of X.
+     */
     addXChange(handler) {
         this[xHandlersSymbol].add(handler);
     }
+    /**
+     * Removes a handler from change notifications on the X register.
+     * @param {Function} handler The handler to remove
+     */
     removeXChange(handler) {
         this[xHandlersSymbol].remove(handler);
     }
@@ -815,13 +843,24 @@ export default class MCS6502 {
         this[ySymbol] = value;
         this[yHandlersSymbol].call(value);
     }
+    /**
+     * Adds a change handler for changes of the Y register.
+     * @param {Function} handler A change handler that gets called with the new value of Y.
+     */
     addYChange(handler) {
         this[yHandlersSymbol].add(handler);
     }
+    /**
+     * Removes a handler from change notifications on the Y register.
+     * @param {Function} handler The handler to remove
+     */
     removeYChange(handler) {
         this[yHandlersSymbol].remove(handler);
     }
 
+    /**
+     * The 6502's program counter register, a 16 bit address.
+     */
     get PC() {
         return this[pcSymbol];
     }
@@ -829,16 +868,36 @@ export default class MCS6502 {
         this[pcSymbol] = value;
         this[breakpointsSymbol].call(this);
     }
+    /**
+     * Adds a conditional breakpoint for a specific address
+     * @param {Address} address The address at which to break
+     * @param {Function} predicate A function that receives the processor, and returns true if the breakpoint handler should be called
+     * @param {Function} handler The handler function for the breakpoint 
+     */
     addBreakpoint(address, predicate, handler) {
         this[breakpointsSymbol].add(handler, {address, predicate});
     }
+    /**
+     * Adds a breakpoint for a specific address
+     * @param {Address} address The address at which to break
+     * @param {Function} handler The handler function for the breakpoint
+     */
     addAddressBreakpoint(address, handler) {
         this[breakpointsSymbol].add(handler, {address});
     }
+    /**
+     * Adds a conditional breakpoint
+     * @param {Function} predicate A function that receives the processor, and returns true if the breakpoint handler should be called
+     * @param {Function} handler The handler function for the breakpoint 
+     */
     addConditionalBreakpoint(predicate, handler) {
         this[breakpointsSymbol].add(handler, {predicate});
     }
+    // TODO: remove breakpoint
 
+    /**
+     * The 6502's stack pointer, a single byte pointer to memory page 1
+     */
     get SP() {
         return this[spSymbol];
     }
@@ -846,24 +905,144 @@ export default class MCS6502 {
         this[spSymbol] = value;
     }
 
+    /**
+     * Pushes a byte onto the stack
+     * @param {Byte} value The byte to push
+     */
+    push(value) {
+        this.poke(0x100 | this.SP, value);
+        this.SP = (this.SP - 1) & 0xFF;
+    }
+    /**
+     * Pulls a byte from the stack
+     * @returns {Byte} the byte that was last pushed onto the stack
+     */
+    pull() {
+        this.SP = (this.SP + 1) & 0xFF;
+        return new Byte(this.peek(0x100 | this.SP));
+    }
+    /**
+     * Inspects the latest value pushed to the stack without moving the stack pointer
+     * @returns {Byte} the byte that was last pushed onto the stack
+     */
+    stackPeek() {
+        return this.peek(0x100 | ((this.SP + 1) & 0xFF));
+    }
+
+    /**
+     * The 6502's status register, a combination of C, Z, I, D, B, V, and N
+     */
     get SR() {
         return this[srSymbol];
     }
     set SR(value) {
-        this[srSymbol] = value;
+        this[srSymbol] = (value & 0xFF) | 0x20;
+    }
+    /**
+     * The 6502's carry bit
+     */
+    get C() {
+        return (this[srSymbol] & 0x01) != 0;
+    }
+    set C(value) {
+        if (value) this[srSymbol] |= 0x01;
+        else this[srSymbol] &= 0xFE;
+    }
+    /**
+     * The 6502's zero bit
+     */
+    get Z() {
+        return (this[srSymbol] & 0x02) != 0;
+    }
+    set Z(value) {
+        if (value) this[srSymbol] |= 0x02;
+        else this[srSymbol] &= 0xFD;
+    }
+    /**
+     * The 6502's interrupt bit. If set to true, disables interrupt requests (IRQ).
+     */
+    get I() {
+        return (this[srSymbol] & 0x04) != 0;
+    }
+    set I(value) {
+        if (value) this[srSymbol] |= 0x04;
+        else this[srSymbol] &= 0xFB;
+    }
+    /**
+     * The 6502's decimal bit.
+     * If set to true, arithmetic operations are done in binary-coded decimal (BCD).
+     */
+    get D() {
+        return (this[srSymbol] & 0x08) != 0;
+    }
+    set D(value) {
+        if (value) this[srSymbol] |= 0x08;
+        else this[srSymbol] &= 0xF7;
+    }
+    /**
+     * The 6502's break bit.
+     * If set to true, an interruption is triggered.
+     */
+    get B() {
+        return (this[srSymbol] & 0x10) != 0;
+    }
+    set B(value) {
+        if (value) this[srSymbol] |= 0x10;
+        else this[srSymbol] &= 0xEF;
+        // TODO interrupt
+    }
+    /**
+     * The 6502's overflow bit.
+     */
+    get V() {
+        return (this[srSymbol] & 0x40) != 0;
+    }
+    set V(value) {
+        if (value) this[srSymbol] |= 0x40;
+        else this[srSymbol] &= 0xBF;
+    }
+    /**
+     * The 6502's negative bit.
+     */
+    get N() {
+        return (this[srSymbol] & 0x80) != 0;
+    }
+    set N(value) {
+        if (value) this[srSymbol] |= 0x80;
+        else this[srSymbol] &= 0x7F;
     }
 
+    /**
+     * Reads an address from memory
+     * @param {Address} pointer The address where to look for an address
+     * @param {bool} zeroPage If true, the address is constrained to page 0
+     * even if the address points at the boundary of the page.
+     * @returns {Address} The address read from memory
+     */
     addressAt(pointer, zeroPage = false) {
         return this[memorySymbol].addressAt(pointer, zeroPage);
     }
 
+    /**
+     * Returns the byte at the provided address in memory
+     * @param {Address} address The address at which to look
+     * @returns {Byte} the byte read from memory
+     */
     peek(address) {
         return this[memorySymbol].peek(address);
     }
+    /**
+     * Writes a byte to memory
+     * @param {Address} address The address at which to write
+     * @param {Byte} value The byte to write
+     */
     poke(address, value) {
         this[memorySymbol].poke(address, value);
     }
 
+    /**
+     * Executes the instruction at the PC, then moves PC to the next instruction
+     */
     step() {
         let opCode = this.peek(this.PC);
         let instruction = this[instructionSetSymbol].get(opCode);
@@ -874,15 +1053,9 @@ export default class MCS6502 {
         this.PC += 1 + instruction.bytes;
     }
 
-    push(value) {
-        this.poke(0x100 | this.SP, value);
-        this.SP = (this.SP - 1) & 0xFF;
-    }
-    pull() {
-        this.SP = (this.SP + 1) & 0xFF;
-        return new Byte(this.peek(0x100 | this.SP));
-    }
-
+    /**
+     * The 6502's instruction set, as an array indexed by opCode
+     */
     get instructionSet() { return this[instructionSetSymbol]; }
 
     // TODO

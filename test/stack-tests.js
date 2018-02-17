@@ -132,4 +132,28 @@ describe('stack', () => {
         cpu.pull().should.equal(0x04);
         cpu.SP.should.equal(0x02);
     });
+
+    it('can peek into the stack', () => {
+        let cpu = new MCS6502({SP: 0x01});
+
+        cpu.push(0x01);
+        cpu.stackPeek().should.equal(0x01);
+        cpu.SP.should.equal(0x00);
+
+        cpu.push(0x02);
+        cpu.stackPeek().should.equal(0x02);
+        cpu.SP.should.equal(0xFF);
+
+        cpu.push(0x03);
+        cpu.stackPeek().should.equal(0x03);
+        cpu.SP.should.equal(0xFE);
+
+        cpu.push(0x04);
+        cpu.stackPeek().should.equal(0x04);
+        cpu.SP.should.equal(0xFD);        
+        cpu.stackPeek().should.equal(0x04);
+        cpu.SP.should.equal(0xFD);        
+        cpu.stackPeek().should.equal(0x04);
+        cpu.SP.should.equal(0xFD);        
+    });
 });
