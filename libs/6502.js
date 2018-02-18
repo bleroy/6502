@@ -144,8 +144,8 @@ export class Ram {
      */
     addressAt(address, zeroPage = false) {
         return new Address(
-            this[memorySymbol][address]
-                + 256 * this[memorySymbol][(address + 1) & (zeroPage ? 0xFF : 0xFFFF)]
+            this[memorySymbol][address] |
+                (this[memorySymbol][(address + 1) & (zeroPage ? 0xFF : 0xFFFF)] << 8)
             );
     }
 
@@ -160,10 +160,13 @@ export class Ram {
     /**
      * Writes a byte to memory.
      * @param {Address} address The adress where the byte must be written.
-     * @param {(Byte | Number)} value The value to write to memory. 
+     * @param {(Byte | Number)} bytes The bytes to write to memory. 
      */
-    poke(address, value) {
-        this[memorySymbol][address.valueOf()] = value;
+    poke(address, ...bytes) {
+        let addr = address.valueOf();
+        for (let i = 0; i < bytes.length; i++) {
+            this[memorySymbol][addr + i] = bytes[i];
+        }
     }
 }
 
@@ -467,8 +470,6 @@ class BRK extends Instruction {
             mnemonic: 'BRK',
             description: 'Force break',
             implementation: (processor) => {
-                processor.push(processor.PC + 2);
-                processor.push(processor.SR);
                 processor.interrupt();
             }
         });
@@ -1032,19 +1033,19 @@ export default class MCS6502 {
         return this[memorySymbol].peek(address);
     }
     /**
-     * Writes a byte to memory
+     * Writes bytes to memory
      * @param {Address} address The address at which to write
-     * @param {Byte} value The byte to write
+     * @param {Byte} bytes The bytes to write
      */
-    poke(address, value) {
-        this[memorySymbol].poke(address, value);
+    poke(address, ...bytes) {
+        this[memorySymbol].poke(address, ...bytes);
     }
 
     /**
      * Executes the instruction at the PC, then moves PC to the next instruction
      */
     step() {
-        let opCode = this.peek(this.PC);
+        let opCode = this.peek(this.PC).value;
         let instruction = this[instructionSetSymbol].get(opCode);
         let operand = instruction.bytes == 0 ? null
         : instruction.bytes == 1 ? this.peek(this.PC + 1)
@@ -1058,6 +1059,24 @@ export default class MCS6502 {
      */
     get instructionSet() { return this[instructionSetSymbol]; }
 
-    // TODO
-    interrupt() {}
+    /**
+     * Triggers a 6502 interrupt, which sets the IRQ prevention bit,
+     * then loads the program counter with the address at $FFFE.
+     */
+    interrupt() {
+        this.PC++;
+        this.push((this.PC >> 8) & 0xFF);
+        this.push(this.PC & 0xFF);
+        this.B = true;
+        this.push(this.SR);
+        this.I = true;
+        this.PC = this.interruptVector;
+    }
+
+    get interruptVector() {
+        return this.addressAt(0xFFFE);
+    }
+    set interruptVector(value) {
+        this.poke(0xFFFE, value & 0xFF, (value >> 8) & 0xFF);
+    }
 }
