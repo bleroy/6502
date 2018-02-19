@@ -130,8 +130,8 @@ export class Ram {
      * @param {(Array | Uint8Array | Number)} bytes
      * The array to store the memory in, or the number of bytes to reserve
      */
-    constructor (bytes = new Uint8Array(65536)) {
-        this[memorySymbol] = 
+    constructor(bytes = new Uint8Array(65536)) {
+        this[memorySymbol] =
             bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
     }
 
@@ -145,8 +145,8 @@ export class Ram {
     addressAt(address, zeroPage = false) {
         return new Address(
             this[memorySymbol][address] |
-                (this[memorySymbol][(address + 1) & (zeroPage ? 0xFF : 0xFFFF)] << 8)
-            );
+            (this[memorySymbol][(address + 1) & (zeroPage ? 0xFF : 0xFFFF)] << 8)
+        );
     }
 
     /**
@@ -186,12 +186,12 @@ export class Ram {
  * @returns {Address} - the Address result of the evaluation.
  */
 
- /**
-  * A function that generates the string form of an address mode for use by the disassembler.
-  * @callback addressModeDisassembler
-  * @param {(Address|Byte)=} operand - the operand to format.
-  * @returns {string} - the disassembled form of the operand for this address mode.
-  */
+/**
+ * A function that generates the string form of an address mode for use by the disassembler.
+ * @callback addressModeDisassembler
+ * @param {(Address|Byte)=} operand - the operand to format.
+ * @returns {string} - the disassembled form of the operand for this address mode.
+ */
 
 /**
  * A 6502 address mode, modeling the various ways an instruction can refer to memory, registers, or literal data.
@@ -216,7 +216,7 @@ export class AddressMode {
      * @param {addressModeDisassembler} mode.disassemble - a function that generates a string representation of the operand
      * for this address mode, to be used by the disassembler.
      */
-    constructor({name, description, evaluate, evaluateAddress, disassemble, bytes}) {
+    constructor({ name, description, evaluate, evaluateAddress, disassemble, bytes }) {
         this.name = name;
         this.description = description;
         this.evaluateInternal = evaluate;
@@ -357,9 +357,9 @@ export let AddressModes = {
  * @returns {Number} - the number of cycles used by the instruction.
  */
 
- /**
- * A base class for all 6502 instructions.
- */
+/**
+* A base class for all 6502 instructions.
+*/
 export class Instruction {
     /**
      * Constructs a base instruction
@@ -370,7 +370,7 @@ export class Instruction {
      * @param {instructionImplementation} instr.implementation - the implementation of the instruction
      * @param {AddressMode} instr.addressMode - the address mode
      */
-    constructor({mnemonic, opCode, description, implementation, addressMode = AddressModes.implied}) {
+    constructor({ mnemonic, opCode, description, implementation, addressMode = AddressModes.implied }) {
         this.mnemonic = mnemonic;
         this.opCode = opCode;
         this.description = description;
@@ -404,7 +404,7 @@ export class Instruction {
  * @param {MCS6502} processor The processor
  * @param {Address} address The address at which to start disassembling memory
  */
-export function* disassemble (processor, address) {
+export function* disassemble(processor, address) {
     while (address < 0xFFFF) {
         let opCode = processor.peek(address).value;
         let instruction = processor.instructionSet.get(opCode);
@@ -413,19 +413,19 @@ export function* disassemble (processor, address) {
             continue;
         }
         let addressMode = instruction.addressMode;
-        let operand = 
+        let operand =
             addressMode.bytes == 0 ? null :
-            addressMode.bytes == 1 ? processor.peek(address + 1) :
-            processor.addressAt(address + 1);
+                addressMode.bytes == 1 ? processor.peek(address + 1) :
+                    processor.addressAt(address + 1);
         let memoryDump = (
             address.toString(16).toUpperCase().padStart(4, '0') + ' ' +
             opCode.toString(16).toUpperCase().padStart(2, '0') + ' ' +
             (addressMode.bytes > 0 ?
                 processor.peek(address + 1).value.toString(16).toUpperCase().padStart(2, '0') + ' ' +
-                (addressMode.bytes > 1 ? 
+                (addressMode.bytes > 1 ?
                     processor.peek(address + 2).value.toString(16).toUpperCase().padStart(2, '0') :
                     ''
-                ): ''
+                ) : ''
             )
         ).padEnd(14, ' ');
         yield memoryDump + instruction.disassemble(operand);
@@ -434,33 +434,46 @@ export function* disassemble (processor, address) {
 }
 
 class ADC extends Instruction {
-    constructor({opCode, addressMode}) {
+    constructor({ opCode, addressMode }) {
         super({
             opCode, addressMode,
             mnemonic: 'ADC',
             description: 'Add with carry',
-            implementation: (processor, operand) => {
-                let oldA = new Byte(processor.A);
-                let sum = oldA + (processor.C ? 1 : 0) + addressMode.evaluate(processor, operand);
-                processor.A = sum & 0xFF;
-                processor.C = sum > (processor.D ? 99 : 255);
-                processor.Z = processor.A == 0;
-                processor.V = sum > 127 || sum < -128;
-                processor.N = processor.A & 0x80 != 0;
+            implementation: (cpu, operand) => {
+                let oldA = new Byte(cpu.A).value;
+                let val = addressMode.evaluate(cpu, operand).value;
+                let sum = oldA + val + (cpu.C ? 1 : 0);
+                // console.log(`ADC: A=${oldA}, sum=${sum}`);
+                cpu.Z = (sum & 0xFF) == 0;
+                if (cpu.D) {
+                    if (((oldA & 0xF) + (val & 0xF) + (cpu.C ? 1 : 0)) > 9) {
+                        sum += 6;
+                    }
+                    cpu.N = (sum & 0x80) != 0;
+                    cpu.V = !((oldA ^ val) & 0x80) && ((oldA ^ sum) & 0x80);
+                    if (src > 0x99) src += 96;
+                    cpu.C = sum > 0x99;
+                }
+                else {
+                    cpu.N = (sum & 0x80) != 0;
+                    cpu.V = !((oldA ^ val) & 0x80) && ((oldA ^ sum) & 0x80);
+                    cpu.C = sum > 0xFF;
+                }
+                cpu.A = new Byte(sum & 0xFF);
             }
         });
     }
 }
 
-class AND extends Instruction {}
-class ASL extends Instruction {}
-class BCC extends Instruction {}
-class BCS extends Instruction {}
-class BEQ extends Instruction {}
-class BIT extends Instruction {}
-class BMI extends Instruction {}
-class BNE extends Instruction {}
-class BPL extends Instruction {}
+class AND extends Instruction { }
+class ASL extends Instruction { }
+class BCC extends Instruction { }
+class BCS extends Instruction { }
+class BEQ extends Instruction { }
+class BIT extends Instruction { }
+class BMI extends Instruction { }
+class BNE extends Instruction { }
+class BPL extends Instruction { }
 
 class BRK extends Instruction {
     constructor() {
@@ -476,27 +489,27 @@ class BRK extends Instruction {
     }
 }
 
-class BVC extends Instruction {}
-class BVS extends Instruction {}
-class CLC extends Instruction {}
-class CLD extends Instruction {}
-class CLI extends Instruction {}
-class CLV extends Instruction {}
-class CMP extends Instruction {}
-class CPX extends Instruction {}
-class CPY extends Instruction {}
-class DEC extends Instruction {}
-class DEX extends Instruction {}
-class DEY extends Instruction {}
-class EOR extends Instruction {}
-class INC extends Instruction {}
-class INX extends Instruction {}
-class INY extends Instruction {}
-class JMP extends Instruction {}
-class JSR extends Instruction {}
+class BVC extends Instruction { }
+class BVS extends Instruction { }
+class CLC extends Instruction { }
+class CLD extends Instruction { }
+class CLI extends Instruction { }
+class CLV extends Instruction { }
+class CMP extends Instruction { }
+class CPX extends Instruction { }
+class CPY extends Instruction { }
+class DEC extends Instruction { }
+class DEX extends Instruction { }
+class DEY extends Instruction { }
+class EOR extends Instruction { }
+class INC extends Instruction { }
+class INX extends Instruction { }
+class INY extends Instruction { }
+class JMP extends Instruction { }
+class JSR extends Instruction { }
 
 class LDA extends Instruction {
-    constructor({opCode, addressMode}) {
+    constructor({ opCode, addressMode }) {
         super({
             opCode, addressMode,
             mnemonic: 'LDA',
@@ -511,44 +524,44 @@ class LDA extends Instruction {
     }
 }
 
-class LDX extends Instruction {}
-class LDY extends Instruction {}
-class LSR extends Instruction {}
-class NOP extends Instruction {}
-class ORA extends Instruction {}
-class PHA extends Instruction {}
-class PHP extends Instruction {}
-class PLA extends Instruction {}
-class PLP extends Instruction {}
-class ROL extends Instruction {}
-class ROR extends Instruction {}
-class RTI extends Instruction {}
-class RTS extends Instruction {}
-class SBC extends Instruction {}
-class SEC extends Instruction {}
-class SED extends Instruction {}
-class SEI extends Instruction {}
+class LDX extends Instruction { }
+class LDY extends Instruction { }
+class LSR extends Instruction { }
+class NOP extends Instruction { }
+class ORA extends Instruction { }
+class PHA extends Instruction { }
+class PHP extends Instruction { }
+class PLA extends Instruction { }
+class PLP extends Instruction { }
+class ROL extends Instruction { }
+class ROR extends Instruction { }
+class RTI extends Instruction { }
+class RTS extends Instruction { }
+class SBC extends Instruction { }
+class SEC extends Instruction { }
+class SED extends Instruction { }
+class SEI extends Instruction { }
 
 class STA extends Instruction {
-    constructor({opCode, addressMode}) {
+    constructor({ opCode, addressMode }) {
         super({
             opCode, addressMode,
             mnemonic: 'STA',
             description: 'Store accumulator',
             implementation: (processor, operand) => {
-                processor.poke(addressMode.evaluateAddress(processor, operand), processor.A); 
+                processor.poke(addressMode.evaluateAddress(processor, operand), processor.A);
             }
         });
     }
 }
-class STX extends Instruction {}
-class STY extends Instruction {}
-class TAX extends Instruction {}
-class TAY extends Instruction {}
-class TSX extends Instruction {}
-class TXA extends Instruction {}
-class TXS extends Instruction {}
-class TYA extends Instruction {}
+class STX extends Instruction { }
+class STY extends Instruction { }
+class TAX extends Instruction { }
+class TAY extends Instruction { }
+class TSX extends Instruction { }
+class TXA extends Instruction { }
+class TXS extends Instruction { }
+class TYA extends Instruction { }
 
 class InvalidInstruction extends Instruction {
     constructor(opCode) {
@@ -590,157 +603,157 @@ export class InstructionSet {
 }
 
 let mcs6502InstructionSet = new InstructionSet(
-    new BRK({opCode: 0x00, addressMode: AddressModes.implied}),
-    new ORA({opCode: 0x01, addressMode: AddressModes.Xind}),
-    new ORA({opCode: 0x05, addressMode: AddressModes.zpg}),
-    new ASL({opCode: 0x06, addressMode: AddressModes.zpg}),
-    new PHP({opCode: 0x08, addressMode: AddressModes.implied}),
-    new ORA({opCode: 0x09, addressMode: AddressModes.immediate}),
-    new ASL({opCode: 0x0A, addressMode: AddressModes.A}),
-    new ORA({opCode: 0x0D, addressMode: AddressModes.abs}),
-    new ASL({opCode: 0x0E, addressMode: AddressModes.abs}),
-    new BPL({opCode: 0x10, addressMode: AddressModes.rel}),
-    new ORA({opCode: 0x11, addressMode: AddressModes.indY}),
-    new ORA({opCode: 0x15, addressMode: AddressModes.zpgX}),
-    new ASL({opCode: 0x16, addressMode: AddressModes.zpgX}),
-    new CLC({opCode: 0x18, addressMode: AddressModes.implied}),
-    new ORA({opCode: 0x19, addressMode: AddressModes.absY}),
-    new ORA({opCode: 0x1D, addressMode: AddressModes.absX}),
-    new ASL({opCode: 0x1E, addressMode: AddressModes.absX}),
-    new JSR({opCode: 0x20, addressMode: AddressModes.abs}),
-    new AND({opCode: 0x21, addressMode: AddressModes.Xind}),
-    new BIT({opCode: 0x24, addressMode: AddressModes.zeroPage}),
-    new AND({opCode: 0x25, addressMode: AddressModes.zeroPage}),
-    new ROL({opCode: 0x26, addressMode: AddressModes.zeroPage}),
-    new PLP({opCode: 0x28, addressMode: AddressModes.implied}),
-    new AND({opCode: 0x29, addressMode: AddressModes.immediate}),
-    new ROL({opCode: 0x2A, addressMode: AddressModes.A}),
-    new BIT({opCode: 0x2C, addressMode: AddressModes.abs}),
-    new AND({opCode: 0x2D, addressMode: AddressModes.abs}),
-    new ROL({opCode: 0x2E, addressMode: AddressModes.abs}),
-    new BMI({opCode: 0x30, addressMode: AddressModes.rel}),
-    new AND({opCode: 0x31, addressMode: AddressModes.indY}),
-    new AND({opCode: 0x35, addressMode: AddressModes.zpgX}),
-    new ROL({opCode: 0x36, addressMode: AddressModes.zpgX}),
-    new SEC({opCode: 0x38, addressMode: AddressModes.implied}),
-    new AND({opCode: 0x39, addressMode: AddressModes.absY}),
-    new AND({opCode: 0x3D, addressMode: AddressModes.absX}),
-    new ROL({opCode: 0x3E, addressMode: AddressModes.absX}),
-    new RTI({opCode: 0x40, addressMode: AddressModes.implied}),
-    new EOR({opCode: 0x41, addressMode: AddressModes.Xind}),
-    new EOR({opCode: 0x45, addressMode: AddressModes.zpg}),
-    new LSR({opCode: 0x46, addressMode: AddressModes.zpg}),
-    new PHA({opCode: 0x48, addressMode: AddressModes.implied}),
-    new EOR({opCode: 0x49, addressMode: AddressModes.immediate}),
-    new LSR({opCode: 0x4A, addressMode: AddressModes.A}),
-    new JMP({opCode: 0x4C, addressMode: AddressModes.abs}),
-    new EOR({opCode: 0x4D, addressMode: AddressModes.abs}),
-    new LSR({opCode: 0x4E, addressMode: AddressModes.abs}),
-    new BVC({opCode: 0x50, addressMode: AddressModes.rel}),
-    new EOR({opCode: 0x51, addressMode: AddressModes.indY}),
-    new EOR({opCode: 0x55, addressMode: AddressModes.zpgX}),
-    new LSR({opCode: 0x56, addressMode: AddressModes.zpgX}),
-    new CLI({opCode: 0x58, addressMode: AddressModes.implied}),
-    new EOR({opCode: 0x59, addressMode: AddressModes.absY}),
-    new EOR({opCode: 0x5D, addressMode: AddressModes.absX}),
-    new LSR({opCode: 0x5E, addressMode: AddressModes.absX}),
-    new RTS({opCode: 0x60, addressMode: AddressModes.implied}),
-    new ADC({opCode: 0x61, addressMode: AddressModes.Xind}),
-    new ADC({opCode: 0x65, addressMode: AddressModes.zpg}),
-    new ROR({opCode: 0x66, addressMode: AddressModes.zpg}),
-    new PLA({opCode: 0x68, addressMode: AddressModes.implied}),
-    new ADC({opCode: 0x69, addressMode: AddressModes.immediate}),
-    new ROR({opCode: 0x6A, addressMode: AddressModes.A}),
-    new JMP({opCode: 0x6C, addressMode: AddressModes.indirect}),
-    new ADC({opCode: 0x6D, addressMode: AddressModes.abs}),
-    new ROR({opCode: 0x6E, addressMode: AddressModes.abs}),
-    new BVS({opCode: 0x70, addressMode: AddressModes.rel}),
-    new ADC({opCode: 0x71, addressMode: AddressModes.indY}),
-    new ADC({opCode: 0x75, addressMode: AddressModes.zpgX}),
-    new ROR({opCode: 0x76, addressMode: AddressModes.zpgX}),
-    new SEI({opCode: 0x78, addressMode: AddressModes.implied}),
-    new ADC({opCode: 0x79, addressMode: AddressModes.absY}),
-    new ADC({opCode: 0x7D, addressMode: AddressModes.absX}),
-    new ROR({opCode: 0x7E, addressMode: AddressModes.absX}),
-    new STA({opCode: 0x81, addressMode: AddressModes.Xind}),
-    new STY({opCode: 0x84, addressMode: AddressModes.zpg}),
-    new STA({opCode: 0x85, addressMode: AddressModes.zpg}),
-    new STX({opCode: 0x86, addressMode: AddressModes.zpg}),
-    new DEY({opCode: 0x88, addressMode: AddressModes.implied}),
-    new TXA({opCode: 0x8A, addressMode: AddressModes.implied}),
-    new STY({opCode: 0x8C, addressMode: AddressModes.abs}),
-    new STA({opCode: 0x8D, addressMode: AddressModes.abs}),
-    new STX({opCode: 0x8E, addressMode: AddressModes.abs}),
-    new BCC({opCode: 0x90, addressMode: AddressModes.rel}),
-    new STA({opCode: 0x91, addressMode: AddressModes.indY}),
-    new STY({opCode: 0x94, addressMode: AddressModes.zpgX}),
-    new STA({opCode: 0x95, addressMode: AddressModes.zpgX}),
-    new STX({opCode: 0x96, addressMode: AddressModes.zpgY}),
-    new TYA({opCode: 0x98, addressMode: AddressModes.implied}),
-    new STA({opCode: 0x99, addressMode: AddressModes.absY}),
-    new TXS({opCode: 0x9A, addressMode: AddressModes.impl}),
-    new STA({opCode: 0x9D, addressMode: AddressModes.absX}),
-    new LDY({opCode: 0xA0, addressMode: AddressModes.immediate}),
-    new LDA({opCode: 0xA1, addressMode: AddressModes.Xind}),
-    new LDX({opCode: 0xA2, addressMode: AddressModes.immediate}),
-    new LDY({opCode: 0xA4, addressMode: AddressModes.zpg}),
-    new LDA({opCode: 0xA5, addressMode: AddressModes.zpg}),
-    new LDX({opCode: 0xA6, addressMode: AddressModes.zpg}),
-    new TAY({opCode: 0xA8, addressMode: AddressModes.implied}),
-    new LDA({opCode: 0xA9, addressMode: AddressModes.immediate}),
-    new TAX({opCode: 0xAA, addressMode: AddressModes.implied}),
-    new LDY({opCode: 0xAC, addressMode: AddressModes.abs}),
-    new LDA({opCode: 0xAD, addressMode: AddressModes.abs}),
-    new LDX({opCode: 0xAE, addressMode: AddressModes.abs}),
-    new BCS({opCode: 0xB0, addressMode: AddressModes.rel}),
-    new LDA({opCode: 0xB1, addressMode: AddressModes.indY}),
-    new LDY({opCode: 0xB4, addressMode: AddressModes.zpgX}),
-    new LDA({opCode: 0xB5, addressMode: AddressModes.zpgX}),
-    new LDX({opCode: 0xB6, addressMode: AddressModes.zpgY}),
-    new CLV({opCode: 0xB8, addressMode: AddressModes.impl}),
-    new LDA({opCode: 0xB9, addressMode: AddressModes.absY}),
-    new TSX({opCode: 0xBA, addressMode: AddressModes.impl}),
-    new LDY({opCode: 0xBC, addressMode: AddressModes.absX}),
-    new LDA({opCode: 0xBD, addressMode: AddressModes.absX}),
-    new LDX({opCode: 0xBE, addressMode: AddressModes.absY}),
-    new CPY({opCode: 0xC0, addressMode: AddressModes.immediate}),
-    new CMP({opCode: 0xC1, addressMode: AddressModes.Xind}),
-    new CPY({opCode: 0xC4, addressMode: AddressModes.zpg}),
-    new CMP({opCode: 0xC5, addressMode: AddressModes.zpg}),
-    new DEC({opCode: 0xC6, addressMode: AddressModes.zpg}),
-    new INY({opCode: 0xC8, addressMode: AddressModes.implied}),
-    new CMP({opCode: 0xC9, addressMode: AddressModes.immediate}),
-    new DEX({opCode: 0xCA, addressMode: AddressModes.implied}),
-    new CPY({opCode: 0xCC, addressMode: AddressModes.abs}),
-    new CMP({opCode: 0xCD, addressMode: AddressModes.abs}),
-    new DEC({opCode: 0xCE, addressMode: AddressModes.abs}),
-    new BNE({opCode: 0xD0, addressMode: AddressModes.rel}),
-    new CMP({opCode: 0xD1, addressMode: AddressModes.indY}),
-    new CMP({opCode: 0xD5, addressMode: AddressModes.zpgX}),
-    new DEC({opCode: 0xD6, addressMode: AddressModes.zpgX}),
-    new CLD({opCode: 0xD8, addressMode: AddressModes.implied}),
-    new CMP({opCode: 0xD9, addressMode: AddressModes.absY}),
-    new CMP({opCode: 0xDD, addressMode: AddressModes.absX}),
-    new DEC({opCode: 0xDE, addressMode: AddressModes.absX}),
-    new CPX({opCode: 0xE0, addressMode: AddressModes.immediate}),
-    new SBC({opCode: 0xE1, addressMode: AddressModes.Xind}),
-    new CPX({opCode: 0xE4, addressMode: AddressModes.zpg}),
-    new SBC({opCode: 0xE5, addressMode: AddressModes.zpg}),
-    new INC({opCode: 0xE6, addressMode: AddressModes.zpg}),
-    new INX({opCode: 0xE8, addressMode: AddressModes.impl}),
-    new SBC({opCode: 0xE9, addressMode: AddressModes.immediate}),
-    new NOP({opCode: 0xEA, addressMode: AddressModes.implied}),
-    new CPX({opCode: 0xEC, addressMode: AddressModes.abs}),
-    new SBC({opCode: 0xED, addressMode: AddressModes.abs}),
-    new INC({opCode: 0xEE, addressMode: AddressModes.abs}),
-    new BEQ({opCode: 0xF0, addressMode: AddressModes.rel}),
-    new SBC({opCode: 0xF1, addressMode: AddressModes.indY}),
-    new SBC({opCode: 0xF5, addressMode: AddressModes.zpgX}),
-    new INC({opCode: 0xF6, addressMode: AddressModes.zpgX}),
-    new SED({opCode: 0xF8, addressMode: AddressModes.impl}),
-    new SBC({opCode: 0xF9, addressMode: AddressModes.absY}),
-    new SBC({opCode: 0xFD, addressMode: AddressModes.absX}),
-    new INC({opCode: 0xFE, addressMode: AddressModes.absX})
+    new BRK({ opCode: 0x00, addressMode: AddressModes.implied }),
+    new ORA({ opCode: 0x01, addressMode: AddressModes.Xind }),
+    new ORA({ opCode: 0x05, addressMode: AddressModes.zpg }),
+    new ASL({ opCode: 0x06, addressMode: AddressModes.zpg }),
+    new PHP({ opCode: 0x08, addressMode: AddressModes.implied }),
+    new ORA({ opCode: 0x09, addressMode: AddressModes.immediate }),
+    new ASL({ opCode: 0x0A, addressMode: AddressModes.A }),
+    new ORA({ opCode: 0x0D, addressMode: AddressModes.abs }),
+    new ASL({ opCode: 0x0E, addressMode: AddressModes.abs }),
+    new BPL({ opCode: 0x10, addressMode: AddressModes.rel }),
+    new ORA({ opCode: 0x11, addressMode: AddressModes.indY }),
+    new ORA({ opCode: 0x15, addressMode: AddressModes.zpgX }),
+    new ASL({ opCode: 0x16, addressMode: AddressModes.zpgX }),
+    new CLC({ opCode: 0x18, addressMode: AddressModes.implied }),
+    new ORA({ opCode: 0x19, addressMode: AddressModes.absY }),
+    new ORA({ opCode: 0x1D, addressMode: AddressModes.absX }),
+    new ASL({ opCode: 0x1E, addressMode: AddressModes.absX }),
+    new JSR({ opCode: 0x20, addressMode: AddressModes.abs }),
+    new AND({ opCode: 0x21, addressMode: AddressModes.Xind }),
+    new BIT({ opCode: 0x24, addressMode: AddressModes.zeroPage }),
+    new AND({ opCode: 0x25, addressMode: AddressModes.zeroPage }),
+    new ROL({ opCode: 0x26, addressMode: AddressModes.zeroPage }),
+    new PLP({ opCode: 0x28, addressMode: AddressModes.implied }),
+    new AND({ opCode: 0x29, addressMode: AddressModes.immediate }),
+    new ROL({ opCode: 0x2A, addressMode: AddressModes.A }),
+    new BIT({ opCode: 0x2C, addressMode: AddressModes.abs }),
+    new AND({ opCode: 0x2D, addressMode: AddressModes.abs }),
+    new ROL({ opCode: 0x2E, addressMode: AddressModes.abs }),
+    new BMI({ opCode: 0x30, addressMode: AddressModes.rel }),
+    new AND({ opCode: 0x31, addressMode: AddressModes.indY }),
+    new AND({ opCode: 0x35, addressMode: AddressModes.zpgX }),
+    new ROL({ opCode: 0x36, addressMode: AddressModes.zpgX }),
+    new SEC({ opCode: 0x38, addressMode: AddressModes.implied }),
+    new AND({ opCode: 0x39, addressMode: AddressModes.absY }),
+    new AND({ opCode: 0x3D, addressMode: AddressModes.absX }),
+    new ROL({ opCode: 0x3E, addressMode: AddressModes.absX }),
+    new RTI({ opCode: 0x40, addressMode: AddressModes.implied }),
+    new EOR({ opCode: 0x41, addressMode: AddressModes.Xind }),
+    new EOR({ opCode: 0x45, addressMode: AddressModes.zpg }),
+    new LSR({ opCode: 0x46, addressMode: AddressModes.zpg }),
+    new PHA({ opCode: 0x48, addressMode: AddressModes.implied }),
+    new EOR({ opCode: 0x49, addressMode: AddressModes.immediate }),
+    new LSR({ opCode: 0x4A, addressMode: AddressModes.A }),
+    new JMP({ opCode: 0x4C, addressMode: AddressModes.abs }),
+    new EOR({ opCode: 0x4D, addressMode: AddressModes.abs }),
+    new LSR({ opCode: 0x4E, addressMode: AddressModes.abs }),
+    new BVC({ opCode: 0x50, addressMode: AddressModes.rel }),
+    new EOR({ opCode: 0x51, addressMode: AddressModes.indY }),
+    new EOR({ opCode: 0x55, addressMode: AddressModes.zpgX }),
+    new LSR({ opCode: 0x56, addressMode: AddressModes.zpgX }),
+    new CLI({ opCode: 0x58, addressMode: AddressModes.implied }),
+    new EOR({ opCode: 0x59, addressMode: AddressModes.absY }),
+    new EOR({ opCode: 0x5D, addressMode: AddressModes.absX }),
+    new LSR({ opCode: 0x5E, addressMode: AddressModes.absX }),
+    new RTS({ opCode: 0x60, addressMode: AddressModes.implied }),
+    new ADC({ opCode: 0x61, addressMode: AddressModes.Xind }),
+    new ADC({ opCode: 0x65, addressMode: AddressModes.zpg }),
+    new ROR({ opCode: 0x66, addressMode: AddressModes.zpg }),
+    new PLA({ opCode: 0x68, addressMode: AddressModes.implied }),
+    new ADC({ opCode: 0x69, addressMode: AddressModes.immediate }),
+    new ROR({ opCode: 0x6A, addressMode: AddressModes.A }),
+    new JMP({ opCode: 0x6C, addressMode: AddressModes.indirect }),
+    new ADC({ opCode: 0x6D, addressMode: AddressModes.abs }),
+    new ROR({ opCode: 0x6E, addressMode: AddressModes.abs }),
+    new BVS({ opCode: 0x70, addressMode: AddressModes.rel }),
+    new ADC({ opCode: 0x71, addressMode: AddressModes.indY }),
+    new ADC({ opCode: 0x75, addressMode: AddressModes.zpgX }),
+    new ROR({ opCode: 0x76, addressMode: AddressModes.zpgX }),
+    new SEI({ opCode: 0x78, addressMode: AddressModes.implied }),
+    new ADC({ opCode: 0x79, addressMode: AddressModes.absY }),
+    new ADC({ opCode: 0x7D, addressMode: AddressModes.absX }),
+    new ROR({ opCode: 0x7E, addressMode: AddressModes.absX }),
+    new STA({ opCode: 0x81, addressMode: AddressModes.Xind }),
+    new STY({ opCode: 0x84, addressMode: AddressModes.zpg }),
+    new STA({ opCode: 0x85, addressMode: AddressModes.zpg }),
+    new STX({ opCode: 0x86, addressMode: AddressModes.zpg }),
+    new DEY({ opCode: 0x88, addressMode: AddressModes.implied }),
+    new TXA({ opCode: 0x8A, addressMode: AddressModes.implied }),
+    new STY({ opCode: 0x8C, addressMode: AddressModes.abs }),
+    new STA({ opCode: 0x8D, addressMode: AddressModes.abs }),
+    new STX({ opCode: 0x8E, addressMode: AddressModes.abs }),
+    new BCC({ opCode: 0x90, addressMode: AddressModes.rel }),
+    new STA({ opCode: 0x91, addressMode: AddressModes.indY }),
+    new STY({ opCode: 0x94, addressMode: AddressModes.zpgX }),
+    new STA({ opCode: 0x95, addressMode: AddressModes.zpgX }),
+    new STX({ opCode: 0x96, addressMode: AddressModes.zpgY }),
+    new TYA({ opCode: 0x98, addressMode: AddressModes.implied }),
+    new STA({ opCode: 0x99, addressMode: AddressModes.absY }),
+    new TXS({ opCode: 0x9A, addressMode: AddressModes.impl }),
+    new STA({ opCode: 0x9D, addressMode: AddressModes.absX }),
+    new LDY({ opCode: 0xA0, addressMode: AddressModes.immediate }),
+    new LDA({ opCode: 0xA1, addressMode: AddressModes.Xind }),
+    new LDX({ opCode: 0xA2, addressMode: AddressModes.immediate }),
+    new LDY({ opCode: 0xA4, addressMode: AddressModes.zpg }),
+    new LDA({ opCode: 0xA5, addressMode: AddressModes.zpg }),
+    new LDX({ opCode: 0xA6, addressMode: AddressModes.zpg }),
+    new TAY({ opCode: 0xA8, addressMode: AddressModes.implied }),
+    new LDA({ opCode: 0xA9, addressMode: AddressModes.immediate }),
+    new TAX({ opCode: 0xAA, addressMode: AddressModes.implied }),
+    new LDY({ opCode: 0xAC, addressMode: AddressModes.abs }),
+    new LDA({ opCode: 0xAD, addressMode: AddressModes.abs }),
+    new LDX({ opCode: 0xAE, addressMode: AddressModes.abs }),
+    new BCS({ opCode: 0xB0, addressMode: AddressModes.rel }),
+    new LDA({ opCode: 0xB1, addressMode: AddressModes.indY }),
+    new LDY({ opCode: 0xB4, addressMode: AddressModes.zpgX }),
+    new LDA({ opCode: 0xB5, addressMode: AddressModes.zpgX }),
+    new LDX({ opCode: 0xB6, addressMode: AddressModes.zpgY }),
+    new CLV({ opCode: 0xB8, addressMode: AddressModes.impl }),
+    new LDA({ opCode: 0xB9, addressMode: AddressModes.absY }),
+    new TSX({ opCode: 0xBA, addressMode: AddressModes.impl }),
+    new LDY({ opCode: 0xBC, addressMode: AddressModes.absX }),
+    new LDA({ opCode: 0xBD, addressMode: AddressModes.absX }),
+    new LDX({ opCode: 0xBE, addressMode: AddressModes.absY }),
+    new CPY({ opCode: 0xC0, addressMode: AddressModes.immediate }),
+    new CMP({ opCode: 0xC1, addressMode: AddressModes.Xind }),
+    new CPY({ opCode: 0xC4, addressMode: AddressModes.zpg }),
+    new CMP({ opCode: 0xC5, addressMode: AddressModes.zpg }),
+    new DEC({ opCode: 0xC6, addressMode: AddressModes.zpg }),
+    new INY({ opCode: 0xC8, addressMode: AddressModes.implied }),
+    new CMP({ opCode: 0xC9, addressMode: AddressModes.immediate }),
+    new DEX({ opCode: 0xCA, addressMode: AddressModes.implied }),
+    new CPY({ opCode: 0xCC, addressMode: AddressModes.abs }),
+    new CMP({ opCode: 0xCD, addressMode: AddressModes.abs }),
+    new DEC({ opCode: 0xCE, addressMode: AddressModes.abs }),
+    new BNE({ opCode: 0xD0, addressMode: AddressModes.rel }),
+    new CMP({ opCode: 0xD1, addressMode: AddressModes.indY }),
+    new CMP({ opCode: 0xD5, addressMode: AddressModes.zpgX }),
+    new DEC({ opCode: 0xD6, addressMode: AddressModes.zpgX }),
+    new CLD({ opCode: 0xD8, addressMode: AddressModes.implied }),
+    new CMP({ opCode: 0xD9, addressMode: AddressModes.absY }),
+    new CMP({ opCode: 0xDD, addressMode: AddressModes.absX }),
+    new DEC({ opCode: 0xDE, addressMode: AddressModes.absX }),
+    new CPX({ opCode: 0xE0, addressMode: AddressModes.immediate }),
+    new SBC({ opCode: 0xE1, addressMode: AddressModes.Xind }),
+    new CPX({ opCode: 0xE4, addressMode: AddressModes.zpg }),
+    new SBC({ opCode: 0xE5, addressMode: AddressModes.zpg }),
+    new INC({ opCode: 0xE6, addressMode: AddressModes.zpg }),
+    new INX({ opCode: 0xE8, addressMode: AddressModes.impl }),
+    new SBC({ opCode: 0xE9, addressMode: AddressModes.immediate }),
+    new NOP({ opCode: 0xEA, addressMode: AddressModes.implied }),
+    new CPX({ opCode: 0xEC, addressMode: AddressModes.abs }),
+    new SBC({ opCode: 0xED, addressMode: AddressModes.abs }),
+    new INC({ opCode: 0xEE, addressMode: AddressModes.abs }),
+    new BEQ({ opCode: 0xF0, addressMode: AddressModes.rel }),
+    new SBC({ opCode: 0xF1, addressMode: AddressModes.indY }),
+    new SBC({ opCode: 0xF5, addressMode: AddressModes.zpgX }),
+    new INC({ opCode: 0xF6, addressMode: AddressModes.zpgX }),
+    new SED({ opCode: 0xF8, addressMode: AddressModes.impl }),
+    new SBC({ opCode: 0xF9, addressMode: AddressModes.absY }),
+    new SBC({ opCode: 0xFD, addressMode: AddressModes.absX }),
+    new INC({ opCode: 0xFE, addressMode: AddressModes.absX })
 );
 
 /**
@@ -752,9 +765,9 @@ export default class MCS6502 {
      * @param {object} settings 
      */
     constructor({
-        memory = new Ram(), 
-        A = 0, X = 0, Y = 0, SP = 0xFF, PC = 0x200, 
-        N = false, V = false, B = false, D = false, 
+        memory = new Ram(),
+        A = 0, X = 0, Y = 0, SP = 0xFF, PC = 0x200,
+        N = false, V = false, B = false, D = false,
         I = false, Z = false, C = false,
         instructionSet = mcs6502InstructionSet
     } = {}) {
@@ -876,7 +889,7 @@ export default class MCS6502 {
      * @param {Function} handler The handler function for the breakpoint 
      */
     addBreakpoint(address, predicate, handler) {
-        this[breakpointsSymbol].add(handler, {address, predicate});
+        this[breakpointsSymbol].add(handler, { address, predicate });
     }
     /**
      * Adds a breakpoint for a specific address
@@ -884,7 +897,7 @@ export default class MCS6502 {
      * @param {Function} handler The handler function for the breakpoint
      */
     addAddressBreakpoint(address, handler) {
-        this[breakpointsSymbol].add(handler, {address});
+        this[breakpointsSymbol].add(handler, { address });
     }
     /**
      * Adds a conditional breakpoint
@@ -892,7 +905,7 @@ export default class MCS6502 {
      * @param {Function} handler The handler function for the breakpoint 
      */
     addConditionalBreakpoint(predicate, handler) {
-        this[breakpointsSymbol].add(handler, {predicate});
+        this[breakpointsSymbol].add(handler, { predicate });
     }
     // TODO: remove breakpoint
 
@@ -1048,10 +1061,11 @@ export default class MCS6502 {
         let opCode = this.peek(this.PC).value;
         let instruction = this[instructionSetSymbol].get(opCode);
         let operand = instruction.bytes == 0 ? null
-        : instruction.bytes == 1 ? this.peek(this.PC + 1)
-        : this.addressAt(this.PC + 1);
+            : instruction.bytes == 1 ? this.peek(this.PC + 1)
+                : this.addressAt(this.PC + 1);
+        // console.log(`Executing ${instruction.mnemonic} with operand ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
         instruction.implementation(this, operand);
-        this.PC += 1 + instruction.bytes;
+        this.PC += 1 + instruction.addressMode.bytes;
     }
 
     /**
@@ -1065,7 +1079,7 @@ export default class MCS6502 {
      */
     interrupt() {
         this.PC++;
-        this.push((this.PC >> 8) & 0xFF);
+        this.push((this.PC >>> 8) & 0xFF);
         this.push(this.PC & 0xFF);
         this.B = true;
         this.push(this.SR);
@@ -1077,6 +1091,6 @@ export default class MCS6502 {
         return this.addressAt(0xFFFE);
     }
     set interruptVector(value) {
-        this.poke(0xFFFE, value & 0xFF, (value >> 8) & 0xFF);
+        this.poke(0xFFFE, value & 0xFF, (value >>> 8) & 0xFF);
     }
 }
