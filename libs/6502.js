@@ -444,14 +444,13 @@ class ADC extends Instruction {
                 let val = addressMode.evaluate(cpu, operand).value;
                 let sum = oldA + val + (cpu.C ? 1 : 0);
                 // console.log(`ADC: A=${oldA}, sum=${sum}`);
-                cpu.Z = (sum & 0xFF) == 0;
                 if (cpu.D) {
                     if (((oldA & 0xF) + (val & 0xF) + (cpu.C ? 1 : 0)) > 9) {
                         sum += 6;
                     }
-                    cpu.N = (sum & 0x80) != 0;
-                    cpu.V = !((oldA ^ val) & 0x80) && ((oldA ^ sum) & 0x80);
-                    if (src > 0x99) src += 96;
+                    if (sum > 0x99) sum += 96;
+                    cpu.N = false;
+                    cpu.V = false;
                     cpu.C = sum > 0x99;
                 }
                 else {
@@ -459,7 +458,9 @@ class ADC extends Instruction {
                     cpu.V = !((oldA ^ val) & 0x80) && ((oldA ^ sum) & 0x80);
                     cpu.C = sum > 0xFF;
                 }
-                cpu.A = new Byte(sum & 0xFF);
+                sum &= 0xFF;
+                cpu.Z = sum == 0;
+                cpu.A = new Byte(sum);
             }
         });
     }
