@@ -2,7 +2,7 @@ import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
 let should = chai.should();
 
-import MCS6502, { Byte } from '../libs/6502';
+import MCS6502 from '../libs/6502';
 
 describe('stack', () => {
     it('can push and pull', () => {
@@ -19,7 +19,7 @@ describe('stack', () => {
         }
 
         for (let i = 0xFF; i >= 0; i--) {
-            cpu.pull().valueOf().should.equal(new Byte(i).valueOf());
+            cpu.pull().should.equal(i);
         }
     });
 

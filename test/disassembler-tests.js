@@ -20,7 +20,7 @@ let noOperandAddressMode = new AddressMode({
 let byteOperandAddressMode = new AddressMode({
     name: 'mode1',
     description: 'Fake single byte operand address mode',
-    disassemble: operand => `#${new Byte(operand).toString()}`,
+    disassemble: operand => `#${Byte.toString(operand)}`,
     bytes: 1
 });
 

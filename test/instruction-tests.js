@@ -2,7 +2,7 @@ import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
 let should = chai.should();
 
-import MCS6502, { Instruction, AddressModes, Address, Byte } from '../libs/6502';
+import MCS6502, { Instruction, AddressModes, Address } from '../libs/6502';
 
 describe('Instruction', () => {
     describe('constructor', () => {
@@ -35,7 +35,7 @@ describe('Instruction', () => {
                 }
             });
 
-            let cycles = instruction.execute(new MCS6502(), new Byte(42));
+            let cycles = instruction.execute(new MCS6502(), 42);
 
             implementationCalled.should.be.true;
             processorName.should.equal('6502');
@@ -62,7 +62,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
-            cpu.A.value.should.equal(1);
+            cpu.A.should.equal(1);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;
@@ -75,7 +75,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
-            cpu.A.value.should.equal(0x80);
+            cpu.A.should.equal(0x80);
             cpu.N.should.be.true;
             cpu.V.should.be.true;
             cpu.Z.should.be.false;
@@ -87,7 +87,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
-            cpu.A.value.should.equal(0x81);
+            cpu.A.should.equal(0x81);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.true;
             cpu.V.should.be.false;
@@ -100,7 +100,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
-            cpu.A.value.should.equal(0x00);
+            cpu.A.should.equal(0x00);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;
@@ -113,7 +113,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
-            cpu.A.value.should.equal(0xFF);
+            cpu.A.should.equal(0xFF);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.true;
             cpu.V.should.be.false;
@@ -126,7 +126,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
-            cpu.A.value.should.equal(0x7E);
+            cpu.A.should.equal(0x7E);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;
@@ -139,7 +139,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
-            cpu.A.value.should.equal(0x7F);
+            cpu.A.should.equal(0x7F);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.true;
@@ -152,7 +152,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
-            cpu.A.value.should.equal(0xFE);
+            cpu.A.should.equal(0xFE);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.true;
             cpu.V.should.be.false;
@@ -165,7 +165,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
-            cpu.A.value.should.equal(0x02);
+            cpu.A.should.equal(0x02);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;
@@ -178,7 +178,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
-            cpu.A.value.should.equal(0x02);
+            cpu.A.should.equal(0x02);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;
@@ -191,7 +191,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
-            cpu.A.value.should.equal(0x50);
+            cpu.A.should.equal(0x50);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;
@@ -204,7 +204,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
-            cpu.A.value.should.equal(0x51);
+            cpu.A.should.equal(0x51);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;
@@ -217,7 +217,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
-            cpu.A.value.should.equal(0x00);
+            cpu.A.should.equal(0x00);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;
@@ -230,7 +230,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x99); // ADC #$99
             cpu.step();
-            cpu.A.value.should.equal(0x99);
+            cpu.A.should.equal(0x99);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;
@@ -243,7 +243,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x99); // ADC #$99
             cpu.step();
-            cpu.A.value.should.equal(0x48);
+            cpu.A.should.equal(0x48);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;
@@ -256,7 +256,7 @@ describe("instructions", () => {
 
             cpu.poke(0x200, 0x69, 0x99); // ADC #$99
             cpu.step();
-            cpu.A.value.should.equal(0x49);
+            cpu.A.should.equal(0x49);
             cpu.PC.should.equal(0x202);
             cpu.N.should.be.false;
             cpu.V.should.be.false;

@@ -34,7 +34,7 @@ describe('AddressMode', () => {
             let proc = new MCS6502();
 
             let mode = new AddressMode({
-                evaluate: (processor, operand) => new Byte(operand + 2)
+                evaluate: (processor, operand) => operand + 2
             });
 
             mode.evaluate(proc, 40).should.equal(42);
@@ -46,7 +46,7 @@ describe('AddressMode', () => {
             let proc = new MCS6502();
 
             let mode = new AddressMode({
-                evaluate: (processor, operand) => new Byte(0)
+                evaluate: (processor, operand) => 0
             });
 
             expect(() => {mode.evaluateAddress(proc, 42);})
@@ -83,7 +83,7 @@ describe('AddressModes', () => {
             proc.poke(1000, 42);
             let val = AddressModes.abs.evaluate(proc, 1000);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -98,7 +98,7 @@ describe('AddressModes', () => {
             proc.poke(1000, 42);
             let val = AddressModes.absX.evaluate(proc, 970);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -113,7 +113,7 @@ describe('AddressModes', () => {
             proc.poke(1000, 42);
             let val = AddressModes.absY.evaluate(proc, 970);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -126,7 +126,7 @@ describe('AddressModes', () => {
         it('evaluates as the byte passed in', () => {
             let val = AddressModes.immediate.evaluate(null, 42);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -173,7 +173,7 @@ describe('AddressModes', () => {
 
             let val = AddressModes.Xind.evaluate(proc, 0x3E);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -185,7 +185,7 @@ describe('AddressModes', () => {
 
             let val = AddressModes.Xind.evaluate(proc, 0xFA);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
 
             proc.poke(0x01, 0xFE);
@@ -194,7 +194,7 @@ describe('AddressModes', () => {
 
             val = AddressModes.Xind.evaluate(proc, 0xFC);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(10);
         });
 
@@ -212,7 +212,7 @@ describe('AddressModes', () => {
 
             let val = AddressModes.indY.evaluate(proc, 0x43);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -224,7 +224,7 @@ describe('AddressModes', () => {
 
             let val = AddressModes.indY.evaluate(proc, 0xFF);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -264,7 +264,7 @@ describe('AddressModes', () => {
             proc.poke(10, 42);
             let val = AddressModes.zpg.evaluate(proc, 10);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -279,7 +279,7 @@ describe('AddressModes', () => {
             proc.poke(40, 42);
             let val = AddressModes.zpgX.evaluate(proc, 10);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -289,7 +289,7 @@ describe('AddressModes', () => {
 
             let val = AddressModes.zpgY.evaluate(proc, 0xFF);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -304,7 +304,7 @@ describe('AddressModes', () => {
             proc.poke(40, 42);
             let val = AddressModes.zpgY.evaluate(proc, 10);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
@@ -314,7 +314,7 @@ describe('AddressModes', () => {
 
             let val = AddressModes.zpgX.evaluate(proc, 0xFF);
 
-            (val instanceof Byte).should.be.true;
+            (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 

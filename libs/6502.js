@@ -80,44 +80,40 @@ export class Address extends Number {
 }
 
 /**
- * A Number type suitable for representing bytes.
+ * Utilities for dealing with bytes
  */
-export class Byte extends Number {
+export const Byte = {
     /**
-     * Create a new bytes.
+     * Evaluates a number, rejects anything not integer or outside of the -128 to 255 range.
      * @param {Number} value - an integer between -128 and 255.
+     * @returns {Number} - the 0-255 byte value of the number.
      */
-    constructor(value) {
-        value = value.valueOf();
+    fromNumber(value) {
         if (value > 255 || value < -128 || !Number.isInteger(value)) {
             throw new RangeError(`Byte value ${value} was out of the -128..255 range.`);
         }
-        let val = value < 128 ? value : value - 256;
-        super(val);
-        this[valueSymbol] = val;
-    }
+        return value & 0xFF;
+    },
 
     /**
-     * The Number value of the byte, between -128 and 127.
-     * Essentially, this is the signed value of the byte.
-     * This makes it possible to use a byte as if it were a regular number, including correct signed arithmetics.
+     * The signed value of the byte, between -128 and 127.
+     * @param {Number} value - the byte to evaluate as a signed integer.
+     * @returns {Number} - the signed value between -128 and 127.
      */
-    valueOf() {
-        return this[valueSymbol];
-    }
+    signedValue(value) {
+        value = Byte.fromNumber(value);
+        return value < 128 ? value : value - 256;
+    },
 
     /**
-     * The string representation of the byte, in 6502 hex format, e.g. $1F, $FF, $08, etc.
+     * The 6502 notation string representation of the value, in 6502 hex format,
+     * e.g. $1F, $FF, $08, etc.
+     * @param {Number} value - the byte to format.
+     * @returns {string} - the 6502 notation string representation of the byte.
      */
-    toString() {
-        return `$${this.value.toString(16).toUpperCase().padStart(2, '0')}`;
-    }
-
-    /**
-     * The unsigned value of the byte, between 0 and 255.
-     */
-    get value() {
-        return this[valueSymbol] & 0xFF;
+    toString(value) {
+        value = Byte.fromNumber(value);
+        return `$${value.toString(16).toUpperCase().padStart(2, '0')}`;
     }
 }
 
@@ -154,13 +150,13 @@ export class Ram {
      * @param {Address} address The address of the byte.
      */
     peek(address) {
-        return new Byte(this[memorySymbol][address.valueOf()]);
+        return this[memorySymbol][address.valueOf()];
     }
 
     /**
      * Writes a byte to memory.
      * @param {Address} address The adress where the byte must be written.
-     * @param {(Byte | Number)} bytes The bytes to write to memory. 
+     * @param {Number} bytes The bytes to write to memory. 
      */
     poke(address, ...bytes) {
         let addr = address.valueOf();
@@ -174,22 +170,22 @@ export class Ram {
  * An address mode evaluation callback.
  * @callback addressModeEvaluation
  * @param {MCS6502} processor - the processor to use to evaluate the address mode.
- * @param {(Byte|Address)=} operand - the operand to evaluate.
- * @returns {(Byte|Address)} - the result of the evaluation.
+ * @param {(Number|Address)=} operand - the operand to evaluate.
+ * @returns {(Number|Address)} - the result of the evaluation.
  */
 
 /**
  * An address mode evaluation callback that always returns an Address.
  * @callback addressModeAddressEvaluation
  * @param {MCS6502} processor - the processor to use to evaluate the address mode.
- * @param {(Byte|Address)=} operand - the operand to evaluate.
+ * @param {(Number|Address)=} operand - the operand to evaluate.
  * @returns {Address} - the Address result of the evaluation.
  */
 
 /**
  * A function that generates the string form of an address mode for use by the disassembler.
  * @callback addressModeDisassembler
- * @param {(Address|Byte)=} operand - the operand to format.
+ * @param {(Number|Address)=} operand - the operand to format.
  * @returns {string} - the disassembled form of the operand for this address mode.
  */
 
@@ -228,24 +224,24 @@ export class AddressMode {
     /**
      * Evaluates the operand as a byte for this address mode, in the context of the passed-in processor.
      * Instructions that handle Byte data, such as ADC, should call into this to evaluate the operand.
-     * @param {MCS6502} processor - the processor in the context of which this operand should be evaluated. 
-     * @param {(Byte|Address)=} operand - the operand to evaluate.
-     * @returns {Byte} - the evaluated result.
+     * @param {MCS6502} cpu - the processor in the context of which this operand should be evaluated. 
+     * @param {(Number|Address)=} operand - the operand to evaluate.
+     * @returns {Number} - the evaluated result.
      */
-    evaluate(processor, operand) {
-        let evaluation = this.evaluateInternal(processor, operand);
-        return evaluation instanceof Address ? processor.peek(evaluation) : evaluation;
+    evaluate(cpu, operand) {
+        let evaluation = this.evaluateInternal(cpu, operand);
+        return evaluation instanceof Address ? cpu.peek(evaluation) : evaluation;
     }
 
     /**
      * Evaluates the operand as an address for this address mode, in the context of the passed-in processor.
      * Instructions that handle addresses, such as JMP, should call into this to evaluate the operand.
-     * @param {MCS6502} processor - the processor in the context of which this operand should be evaluated.
-     * @param {(Byte|Address)=} operand - the operand to evaluate.
+     * @param {MCS6502} cpu - the processor in the context of which this operand should be evaluated.
+     * @param {(Number|Address)=} operand - the operand to evaluate.
      * @returns {Address} - the evaluated address.
      */
-    evaluateAddress(processor, operand) {
-        let evaluation = this.evaluateInternal(processor, operand);
+    evaluateAddress(cpu, operand) {
+        let evaluation = this.evaluateInternal(cpu, operand);
         if (!(evaluation instanceof Address)) throw new TypeError('Result of address mode evaluation is not an address');
         return evaluation;
     }
@@ -258,36 +254,36 @@ export let AddressModes = {
     A: new AddressMode({
         name: 'A',
         description: 'Accumulator',
-        evaluate: (processor) => processor.A,
+        evaluate: cpu => cpu.A,
         disassemble: () => 'A',
         bytes: 0
     }),
     abs: new AddressMode({
         name: 'abs',
         description: 'absolute',
-        evaluate: (processor, address) => new Address(address),
+        evaluate: (cpu, address) => new Address(address),
         disassemble: address => new Address(address).toString(),
         bytes: 2
     }),
     absX: new AddressMode({
         name: 'abs,X',
         description: 'absolute, X-indexed',
-        evaluate: (processor, address) => new Address(address + processor.X),
+        evaluate: (cpu, address) => new Address(address + cpu.X),
         disassemble: address => `${new Address(address).toString()},X`,
         bytes: 2
     }),
     absY: new AddressMode({
         name: 'abs,Y',
         description: 'absolute, Y-indexed',
-        evaluate: (processor, address) => new Address(address + processor.Y),
+        evaluate: (cpu, address) => new Address(address + cpu.Y),
         disassemble: address => `${new Address(address).toString()},Y`,
         bytes: 2
     }),
     immediate: new AddressMode({
         name: '#',
         description: 'immediate',
-        evaluate: (processor, operand) => new Byte(operand),
-        disassemble: operand => `#${new Byte(operand).toString()}`,
+        evaluate: (cpu, operand) => operand,
+        disassemble: operand => `#${Byte.toString(operand)}`,
         bytes: 1
     }),
     implied: new AddressMode({
@@ -300,50 +296,50 @@ export let AddressModes = {
     indirect: new AddressMode({
         name: 'ind',
         description: 'indirect',
-        evaluate: (processor, address) => new Address(processor.addressAt(address)),
+        evaluate: (cpu, address) => new Address(cpu.addressAt(address)),
         disassemble: address => `(${new Address(address).toString()})`,
         bytes: 2
     }),
     Xind: new AddressMode({
         name: 'X,ind',
         description: 'X-indexed, indirect',
-        evaluate: (processor, address) => new Address(processor.addressAt((address + processor.X) & 0xFF, true)),
-        disassemble: address => `(${new Byte(address).toString()},X)`,
+        evaluate: (cpu, address) => new Address(cpu.addressAt((address + cpu.X) & 0xFF, true)),
+        disassemble: address => `(${Byte.toString(address)},X)`,
         bytes: 1
     }),
     indY: new AddressMode({
         name: 'ind,Y',
         description: 'indirect, Y-indexed',
-        evaluate: (processor, address) => new Address(processor.addressAt(address, true) + processor.Y),
-        disassemble: address => `(${new Byte(address).toString()}),Y`,
+        evaluate: (cpu, address) => new Address(cpu.addressAt(address, true) + cpu.Y),
+        disassemble: address => `(${Byte.toString(address)}),Y`,
         bytes: 1
     }),
     rel: new AddressMode({
         name: 'rel',
         description: 'relative',
-        evaluate: (processor, offset) => new Address(processor.PC + offset),
-        disassemble: offset => `${new Byte(offset).toString()}`,
+        evaluate: (cpu, offset) => new Address(cpu.PC + offset),
+        disassemble: offset => `${Byte.toString(offset)}`,
         bytes: 1
     }),
     zpg: new AddressMode({
         name: 'zpg',
         description: 'zero page',
-        evaluate: (processor, address) => new Address(address),
-        disassemble: address => `${new Byte(address).toString()}`,
+        evaluate: (cpu, address) => new Address(address),
+        disassemble: address => `${Byte.toString(address)}`,
         bytes: 1
     }),
     zpgX: new AddressMode({
         name: 'zpg,X',
         description: 'zero page, X-indexed',
-        evaluate: (processor, address) => new Address((address + processor.X) & 0xFF),
-        disassemble: address => `${new Byte(address).toString()},X`,
+        evaluate: (cpu, address) => new Address((address + cpu.X) & 0xFF),
+        disassemble: address => `${Byte.toString(address)},X`,
         bytes: 1
     }),
     zpgY: new AddressMode({
         name: 'zpg,Y',
         description: 'zero page, Y-indexed',
-        evaluate: (processor, address) => new Address((address + processor.Y) & 0xFF),
-        disassemble: address => `${new Byte(address).toString()},Y`,
+        evaluate: (cpu, address) => new Address((address + cpu.Y) & 0xFF),
+        disassemble: address => `${Byte.toString(address)},Y`,
         bytes: 1
     })
 }
@@ -352,8 +348,8 @@ export let AddressModes = {
 /**
  * An instruction implementation callback.
  * @callback instructionImplementation
- * @param {MCS6502} processor - the processor to use to evaluate the address mode.
- * @param {(Byte|Address)=} operand - the operand to evaluate.
+ * @param {MCS6502} cpu - the processor to use to evaluate the address mode.
+ * @param {(Number|Address)=} operand - the operand to evaluate.
  * @returns {Number} - the number of cycles used by the instruction.
  */
 
@@ -365,7 +361,7 @@ export class Instruction {
      * Constructs a base instruction
      * @param {Object} instr
      * @param {string} instr.mnemonic - the 3-letter mnemonic for the instruction, such as 'JMP'
-     * @param {Byte} instr.opCode - the operation code for the instruction
+     * @param {Number} instr.opCode - the operation code for the instruction
      * @param {string}  instr.description - a human-readable description of the instruction
      * @param {instructionImplementation} instr.implementation - the implementation of the instruction
      * @param {AddressMode} instr.addressMode - the address mode
@@ -380,50 +376,57 @@ export class Instruction {
 
     /**
      * Executes the instruction on a processor
-     * @param {MCS6502} processor - the processor on which to execute the instruction
-     * @param {(Byte|Address)=} operand - the argument to the instruction
+     * @param {MCS6502} cpu - the processor on which to execute the instruction
+     * @param {(Number|Address)=} operand - the argument to the instruction
      * @returns {Number} - the number of cycles spent executing the instruction
      */
-    execute(processor, operand) {
-        return this.implementation(processor, operand);
+    execute(cpu, operand) {
+        return this.implementation(cpu, operand);
     }
 
     /**
      * Disassembles the instruction for an address and operand
-     * @param {(Address|Byte)} operand - the operand for the instruction
+     * @param {(Number|Address)} operand - the operand for the instruction
      * @returns {string} - the disassembled instruction in the form Address Mnemonic Operand
      */
     disassemble(operand) {
         return `${this.mnemonic} ${this.addressMode.disassemble(operand)}`.trim();
+    }
+
+    /**
+     * A string representation of the instruction
+     */
+    toString() {
+        return `${this.mnemonic} ${this.addressMode.name}`;
     }
 }
 
 // Here be dragons...
 /**
  * An iterator that disassembles memory one instruction at a time.
- * @param {MCS6502} processor The processor
+ * @param {MCS6502} cpu The processor
  * @param {Address} address The address at which to start disassembling memory
  */
-export function* disassemble(processor, address) {
+export function* disassemble(cpu, address) {
     while (address < 0xFFFF) {
-        let opCode = processor.peek(address).value;
-        let instruction = processor.instructionSet.get(opCode);
+        let opCode = cpu.peek(address);
+        let instruction = cpu.instructionSet.get(opCode);
         if (!instruction || instruction instanceof InvalidInstruction) {
-            yield `${address.valueOf().toString(16).toUpperCase().padStart(4, '0')}          *** # Unknown opCode ${new Byte(opCode).toString()}`;
+            yield `${address.valueOf().toString(16).toUpperCase().padStart(4, '0')}          *** # Unknown opCode ${Byte.toString(opCode)}`;
             continue;
         }
         let addressMode = instruction.addressMode;
         let operand =
             addressMode.bytes == 0 ? null :
-                addressMode.bytes == 1 ? processor.peek(address + 1) :
-                    processor.addressAt(address + 1);
+                addressMode.bytes == 1 ? cpu.peek(address + 1) :
+                    cpu.addressAt(address + 1);
         let memoryDump = (
             address.toString(16).toUpperCase().padStart(4, '0') + ' ' +
             opCode.toString(16).toUpperCase().padStart(2, '0') + ' ' +
             (addressMode.bytes > 0 ?
-                processor.peek(address + 1).value.toString(16).toUpperCase().padStart(2, '0') + ' ' +
+                cpu.peek(address + 1).toString(16).toUpperCase().padStart(2, '0') + ' ' +
                 (addressMode.bytes > 1 ?
-                    processor.peek(address + 2).value.toString(16).toUpperCase().padStart(2, '0') :
+                    cpu.peek(address + 2).toString(16).toUpperCase().padStart(2, '0') :
                     ''
                 ) : ''
             )
@@ -440,8 +443,8 @@ class ADC extends Instruction {
             mnemonic: 'ADC',
             description: 'Add with carry',
             implementation: (cpu, operand) => {
-                let oldA = new Byte(cpu.A).value;
-                let val = addressMode.evaluate(cpu, operand).value;
+                let oldA = cpu.A;
+                let val = addressMode.evaluate(cpu, operand);
                 let sum = oldA + val + (cpu.C ? 1 : 0);
                 // console.log(`ADC: A=${oldA}, sum=${sum}`);
                 if (cpu.D) {
@@ -460,7 +463,7 @@ class ADC extends Instruction {
                 }
                 sum &= 0xFF;
                 cpu.Z = sum == 0;
-                cpu.A = new Byte(sum);
+                cpu.A = sum;
             }
         });
     }
@@ -483,8 +486,8 @@ class BRK extends Instruction {
             addressMode: null,
             mnemonic: 'BRK',
             description: 'Force break',
-            implementation: (processor) => {
-                processor.interrupt();
+            implementation: (cpu) => {
+                cpu.interrupt();
             }
         });
     }
@@ -535,7 +538,7 @@ class ORA extends Instruction {
             mnemonic: 'ORA',
             description: 'Bitwise OR with the accumulator',
             implementation: (cpu, operand) => {
-                let value = addressMode.evaluate(cpu, operand).value;
+                let value = addressMode.evaluate(cpu, operand);
                 cpu.A |= value;
                 cpu.setFlags(cpu.A);
             }
@@ -561,8 +564,8 @@ class STA extends Instruction {
             opCode, addressMode,
             mnemonic: 'STA',
             description: 'Store accumulator',
-            implementation: (processor, operand) => {
-                processor.poke(addressMode.evaluateAddress(processor, operand), processor.A);
+            implementation: (cpu, operand) => {
+                cpu.poke(addressMode.evaluateAddress(cpu, operand), cpu.A);
             }
         });
     }
@@ -583,8 +586,8 @@ class InvalidInstruction extends Instruction {
             addressMode: null,
             mnemonic: 'N/A',
             description: 'Invalid instruction',
-            implementation: (processor, operand) => {
-                throw new Error(`OpCode ${opCode} does not correspond to any instruction on the ${processor.name} processor.`);
+            implementation: (cpu, operand) => {
+                throw new Error(`OpCode ${opCode} does not correspond to any instruction on the ${cpu.name} processor.`);
             }
         });
     }
@@ -791,8 +794,8 @@ export default class MCS6502 {
         this[ySymbol] = Y;
         this[spSymbol] = SP;
         this[pcSymbol] = PC;
-        this[srSymbol] = new Byte(0x20 | (N ? 0x80 : 0) | (V ? 0x40 : 0) | (B ? 0x10 : 0)
-            | (D ? 0x08 : 0) | (I ? 0x04 : 0) | (Z ? 0x02 : 0) | (C ? 0x01 : 0));
+        this[srSymbol] = 0x20 | (N ? 0x80 : 0) | (V ? 0x40 : 0) | (B ? 0x10 : 0)
+            | (D ? 0x08 : 0) | (I ? 0x04 : 0) | (Z ? 0x02 : 0) | (C ? 0x01 : 0);
 
         this[aHandlersSymbol] = delegate();
         this[xHandlersSymbol] = delegate();
@@ -934,7 +937,7 @@ export default class MCS6502 {
 
     /**
      * Pushes a byte onto the stack
-     * @param {Byte} value The byte to push
+     * @param {Number} value The byte to push
      */
     push(value) {
         this.poke(0x100 | this.SP, value);
@@ -942,15 +945,15 @@ export default class MCS6502 {
     }
     /**
      * Pulls a byte from the stack
-     * @returns {Byte} the byte that was last pushed onto the stack
+     * @returns {Number} the byte that was last pushed onto the stack
      */
     pull() {
         this.SP = (this.SP + 1) & 0xFF;
-        return new Byte(this.peek(0x100 | this.SP));
+        return this.peek(0x100 | this.SP);
     }
     /**
      * Inspects the latest value pushed to the stack without moving the stack pointer
-     * @returns {Byte} the byte that was last pushed onto the stack
+     * @returns {Number} the byte that was last pushed onto the stack
      */
     stackPeek() {
         return this.peek(0x100 | ((this.SP + 1) & 0xFF));
@@ -1041,7 +1044,7 @@ export default class MCS6502 {
 
     /**
      * Sets the Z and N flags to reflect the passed-in value
-     * @param {Byte} value The value to set flags from
+     * @param {Number} value The value to set flags from
      */
     setFlags(value) {
         this.Z = value == 0;
@@ -1062,7 +1065,7 @@ export default class MCS6502 {
     /**
      * Returns the byte at the provided address in memory
      * @param {Address} address The address at which to look
-     * @returns {Byte} the byte read from memory
+     * @returns {Number} the byte read from memory
      */
     peek(address) {
         return this[memorySymbol].peek(address);
@@ -1070,7 +1073,7 @@ export default class MCS6502 {
     /**
      * Writes bytes to memory
      * @param {Address} address The address at which to write
-     * @param {Byte} bytes The bytes to write
+     * @param {Number} bytes The bytes to write
      */
     poke(address, ...bytes) {
         this[memorySymbol].poke(address, ...bytes);
@@ -1080,13 +1083,13 @@ export default class MCS6502 {
      * Executes the instruction at the PC, then moves PC to the next instruction
      */
     step() {
-        let opCode = this.peek(this.PC).value;
+        let opCode = this.peek(this.PC);
         let instruction = this[instructionSetSymbol].get(opCode);
         let bytes = instruction.addressMode.bytes;
         let operand = bytes == 0 ? null
             : bytes == 1 ? this.peek(this.PC + 1)
                 : this.addressAt(this.PC + 1);
-        console.log(`Executing ${instruction.mnemonic} with operand ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
+        // console.log(`Executing ${instruction.mnemonic} with operand ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
         instruction.implementation(this, operand);
         this.PC += 1 + instruction.addressMode.bytes;
     }
