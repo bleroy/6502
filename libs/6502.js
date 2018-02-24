@@ -515,11 +515,10 @@ class LDA extends Instruction {
             opCode, addressMode,
             mnemonic: 'LDA',
             description: 'Load accumulator',
-            implementation: (processor, operand) => {
-                let value = addressMode.evaluate(processor, operand);
-                processor.A = value;
-                processor.Z = value == 0;
-                processor.N = value & 0x80 != 0;
+            implementation: (cpu, operand) => {
+                let value = addressMode.evaluate(cpu, operand);
+                cpu.A = value;
+                cpu.setFlags(value);
             }
         });
     }
@@ -529,7 +528,20 @@ class LDX extends Instruction { }
 class LDY extends Instruction { }
 class LSR extends Instruction { }
 class NOP extends Instruction { }
-class ORA extends Instruction { }
+class ORA extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'ORA',
+            description: 'Bitwise OR with the accumulator',
+            implementation: (cpu, operand) => {
+                let value = addressMode.evaluate(cpu, operand).value;
+                cpu.A |= value;
+                cpu.setFlags(cpu.A);
+            }
+        })
+    }
+}
 class PHA extends Instruction { }
 class PHP extends Instruction { }
 class PLA extends Instruction { }
@@ -1028,6 +1040,15 @@ export default class MCS6502 {
     }
 
     /**
+     * Sets the Z and N flags to reflect the passed-in value
+     * @param {Byte} value The value to set flags from
+     */
+    setFlags(value) {
+        this.Z = value == 0;
+        this.N = (value & 0x80) !== 0;
+    }
+
+    /**
      * Reads an address from memory
      * @param {Address} pointer The address where to look for an address
      * @param {bool} zeroPage If true, the address is constrained to page 0
@@ -1061,10 +1082,11 @@ export default class MCS6502 {
     step() {
         let opCode = this.peek(this.PC).value;
         let instruction = this[instructionSetSymbol].get(opCode);
-        let operand = instruction.bytes == 0 ? null
-            : instruction.bytes == 1 ? this.peek(this.PC + 1)
+        let bytes = instruction.addressMode.bytes;
+        let operand = bytes == 0 ? null
+            : bytes == 1 ? this.peek(this.PC + 1)
                 : this.addressAt(this.PC + 1);
-        // console.log(`Executing ${instruction.mnemonic} with operand ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
+        console.log(`Executing ${instruction.mnemonic} with operand ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
         instruction.implementation(this, operand);
         this.PC += 1 + instruction.addressMode.bytes;
     }

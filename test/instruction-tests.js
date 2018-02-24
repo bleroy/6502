@@ -71,7 +71,7 @@ describe("instructions", () => {
         });
 
         it("finds 127 + 1 = -128 with overflow", () => {
-            let cpu = new MCS6502({A: 0x7F});
+            let cpu = new MCS6502({ A: 0x7F });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -83,7 +83,7 @@ describe("instructions", () => {
         });
 
         it("agrees -128 + 1 = -127", () => {
-            let cpu = new MCS6502({A: 0x80});
+            let cpu = new MCS6502({ A: 0x80 });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -96,7 +96,7 @@ describe("instructions", () => {
         });
 
         it("agrees -1 + 1 = 0", () => {
-            let cpu = new MCS6502({A: 0xFF});
+            let cpu = new MCS6502({ A: 0xFF });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -122,7 +122,7 @@ describe("instructions", () => {
         });
 
         it("agrees 127 - 1 = 126", () => {
-            let cpu = new MCS6502({A: 0x7F});
+            let cpu = new MCS6502({ A: 0x7F });
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
@@ -135,7 +135,7 @@ describe("instructions", () => {
         });
 
         it("finds -128 - 1 = 127 with overflow", () => {
-            let cpu = new MCS6502({A: 0x80});
+            let cpu = new MCS6502({ A: 0x80 });
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
@@ -148,7 +148,7 @@ describe("instructions", () => {
         });
 
         it("agrees -1 - 1 = -2", () => {
-            let cpu = new MCS6502({A: 0xFF});
+            let cpu = new MCS6502({ A: 0xFF });
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
@@ -161,7 +161,7 @@ describe("instructions", () => {
         });
 
         it("includes the carry", () => {
-            let cpu = new MCS6502({C: true});
+            let cpu = new MCS6502({ C: true });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -174,7 +174,7 @@ describe("instructions", () => {
         });
 
         it("finds 1 + 1 = 2 also in decimal", () => {
-            let cpu = new MCS6502({A: 0x01, D: true});
+            let cpu = new MCS6502({ A: 0x01, D: true });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -187,7 +187,7 @@ describe("instructions", () => {
         });
 
         it("finds 49 + 1 = 50 in decimal", () => {
-            let cpu = new MCS6502({A: 0x49, D: true});
+            let cpu = new MCS6502({ A: 0x49, D: true });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -200,7 +200,7 @@ describe("instructions", () => {
         });
 
         it("finds 50 + 1 = 51 in decimal", () => {
-            let cpu = new MCS6502({A: 0x50, D: true});
+            let cpu = new MCS6502({ A: 0x50, D: true });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -213,7 +213,7 @@ describe("instructions", () => {
         });
 
         it("finds 99 + 1 = 0 with a carry in decimal", () => {
-            let cpu = new MCS6502({A: 0x99, D: true});
+            let cpu = new MCS6502({ A: 0x99, D: true });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -226,7 +226,7 @@ describe("instructions", () => {
         });
 
         it("finds 0 + 99 = 99 in decimal", () => {
-            let cpu = new MCS6502({D: true});
+            let cpu = new MCS6502({ D: true });
 
             cpu.poke(0x200, 0x69, 0x99); // ADC #$99
             cpu.step();
@@ -239,7 +239,7 @@ describe("instructions", () => {
         });
 
         it("finds 49 + 99 = 48 with carry in decimal", () => {
-            let cpu = new MCS6502({A: 0x49, D: true});
+            let cpu = new MCS6502({ A: 0x49, D: true });
 
             cpu.poke(0x200, 0x69, 0x99); // ADC #$99
             cpu.step();
@@ -252,7 +252,7 @@ describe("instructions", () => {
         });
 
         it("finds 50 + 99 = 49 with carry in decimal", () => {
-            let cpu = new MCS6502({A: 0x50, D: true});
+            let cpu = new MCS6502({ A: 0x50, D: true });
 
             cpu.poke(0x200, 0x69, 0x99); // ADC #$99
             cpu.step();
@@ -262,6 +262,45 @@ describe("instructions", () => {
             cpu.V.should.be.false;
             cpu.Z.should.be.false;
             cpu.C.should.be.true;
+        });
+    });
+
+    describe("ORA", () => {
+        it("does bitwise OR operations on the accumulator", () => {
+            let cpu = new MCS6502();
+
+            cpu.poke(0x200,
+                0x09, 0x00, // ORA #$00
+                0x09, 0x11, // ORA #$11
+                0x09, 0x22, // ORA #$22
+                0x09, 0x44, // ORA #$44
+                0x09, 0x88  // ORA #$88
+            );
+    
+            cpu.step();
+            cpu.A.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+            
+            cpu.step();
+            cpu.A.should.equal(0x11);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+            
+            cpu.step();
+            cpu.A.should.equal(0x33);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+            
+            cpu.step();
+            cpu.A.should.equal(0x77);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+            
+            cpu.step();
+            cpu.A.should.equal(0xFF);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
         });
     });
 });
