@@ -401,7 +401,6 @@ export class Instruction {
     }
 }
 
-// Here be dragons...
 /**
  * An iterator that disassembles memory one instruction at a time.
  * @param {MCS6502} cpu The processor
@@ -469,7 +468,22 @@ class ADC extends Instruction {
     }
 }
 
-class AND extends Instruction { }
+class AND extends Instruction { 
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'AND',
+            description: 'Bitwise AND with the accumulator',
+            implementation: (cpu, operand) => {
+                let value = addressMode.evaluate(cpu, operand);
+                cpu.A &= value;
+                cpu.setFlags(cpu.A);
+            }
+        })
+    }
+}
+
+// Here be dragons...
 class ASL extends Instruction { }
 class BCC extends Instruction { }
 class BCS extends Instruction { }
