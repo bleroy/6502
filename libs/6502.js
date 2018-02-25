@@ -519,7 +519,22 @@ class CPY extends Instruction { }
 class DEC extends Instruction { }
 class DEX extends Instruction { }
 class DEY extends Instruction { }
-class EOR extends Instruction { }
+
+class EOR extends Instruction { 
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'EOR',
+            description: 'Bitwise EOR with the accumulator',
+            implementation: (cpu, operand) => {
+                let value = addressMode.evaluate(cpu, operand);
+                cpu.A ^= value;
+                cpu.setFlags(cpu.A);
+            }
+        })
+    }
+}
+
 class INC extends Instruction { }
 class INX extends Instruction { }
 class INY extends Instruction { }
