@@ -45,17 +45,118 @@ describe('Instruction', () => {
     });
 
     describe('disassemble', () => {
-        let instruction = new Instruction({
-            mnemonic: 'ABC',
-            addressMode: AddressModes.indirect
-        });
-        let disassembled = instruction.disassemble(0x423F);
+        it("disassembles instructions to source code", () => {
+            let instruction = new Instruction({
+                mnemonic: 'ABC',
+                addressMode: AddressModes.indirect
+            });
+            let disassembled = instruction.disassemble(0x423F);
 
-        disassembled.should.equal('ABC ($423F)');
+            disassembled.should.equal('ABC ($423F)');
+        });
     });
 });
 
 describe("instructions", () => {
+    describe("LDA", () => {
+        it("loads the accumulator", () => {
+            let cpu = new MCS6502();
+
+            cpu.poke(0x200,
+                0xA9, 0x12, // LDA #$12
+                0xA9, 0x00, // LDA #$00
+                0xA9, 0x80, // LDA #$80
+                0xA9, 0x7F  // LDA #$7F
+            );
+
+            cpu.step();
+            cpu.A.should.equal(0x012);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.A.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.A.should.equal(0x80);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+
+            cpu.step();
+            cpu.A.should.equal(0x7F);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+        });
+    });
+
+    describe("LDX", () => {
+        it("loads the X register", () => {
+            let cpu = new MCS6502();
+
+            cpu.poke(0x200,
+                0xA2, 0x12, // LDX #$12
+                0xA2, 0x00, // LDX #$00
+                0xA2, 0x80, // LDX #$80
+                0xA2, 0x7F  // LDX #$7F
+            );
+
+            cpu.step();
+            cpu.X.should.equal(0x012);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.X.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.X.should.equal(0x80);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+
+            cpu.step();
+            cpu.X.should.equal(0x7F);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+        });
+    });
+
+    describe("LDY", () => {
+        it("loads the Y register", () => {
+            let cpu = new MCS6502();
+
+            cpu.poke(0x200,
+                0xA0, 0x12, // LDY #$12
+                0xA0, 0x00, // LDY #$00
+                0xA0, 0x80, // LDY #$80
+                0xA0, 0x7F  // LDY #$7F
+            );
+
+            cpu.step();
+            cpu.Y.should.equal(0x012);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.Y.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.Y.should.equal(0x80);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+
+            cpu.step();
+            cpu.Y.should.equal(0x7F);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+        });
+    });
+
     describe("ADC", () => {
         it("agrees 0 + 1 = 1", () => {
             let cpu = new MCS6502();
@@ -276,27 +377,27 @@ describe("instructions", () => {
                 0x09, 0x44, // ORA #$44
                 0x09, 0x88  // ORA #$88
             );
-    
+
             cpu.step();
             cpu.A.should.equal(0x00);
             cpu.Z.should.be.true;
             cpu.N.should.be.false;
-            
+
             cpu.step();
             cpu.A.should.equal(0x11);
             cpu.Z.should.be.false;
             cpu.N.should.be.false;
-            
+
             cpu.step();
             cpu.A.should.equal(0x33);
             cpu.Z.should.be.false;
             cpu.N.should.be.false;
-            
+
             cpu.step();
             cpu.A.should.equal(0x77);
             cpu.Z.should.be.false;
             cpu.N.should.be.false;
-            
+
             cpu.step();
             cpu.A.should.equal(0xFF);
             cpu.Z.should.be.false;
@@ -316,34 +417,34 @@ describe("instructions", () => {
                 0x29, 0x99, // AND #$99
                 0x29, 0x11  // AND #$11
             );
-    
+
             cpu.step();
             cpu.A.should.equal(0x00);
             cpu.Z.should.be.true;
             cpu.N.should.be.false;
-            
+
             cpu.step();
             cpu.A.should.equal(0x00);
             cpu.Z.should.be.true;
             cpu.N.should.be.false;
 
             cpu.A = 0xAA;
-            
+
             cpu.step();
             cpu.A.should.equal(0xAA);
             cpu.Z.should.be.false;
             cpu.N.should.be.true;
-            
+
             cpu.step();
             cpu.A.should.equal(0xAA);
             cpu.Z.should.be.false;
             cpu.N.should.be.true;
-            
+
             cpu.step();
             cpu.A.should.equal(0x88);
             cpu.Z.should.be.false;
             cpu.N.should.be.true;
-            
+
             cpu.step();
             cpu.A.should.equal(0x00);
             cpu.Z.should.be.true;
@@ -353,19 +454,19 @@ describe("instructions", () => {
 
     describe("EOR", () => {
         it("does bitwise EOR operations on the accumulator", () => {
-            let cpu = new MCS6502({A: 0x88});
+            let cpu = new MCS6502({ A: 0x88 });
 
             cpu.poke(0x200,
                 0x49, 0x00, // EOR #$00
                 0x49, 0xFF, // EOR #$FF
                 0x49, 0x33  // EOR #$33
             );
-    
+
             cpu.step();
             cpu.A.should.equal(0x88);
             cpu.Z.should.be.false;
             cpu.N.should.be.true;
-            
+
             cpu.step();
             cpu.A.should.equal(0x77);
             cpu.Z.should.be.false;

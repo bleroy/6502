@@ -556,8 +556,36 @@ class LDA extends Instruction {
     }
 }
 
-class LDX extends Instruction { }
-class LDY extends Instruction { }
+class LDX extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'LDX',
+            description: 'Load the X registry',
+            implementation: (cpu, operand) => {
+                let value = addressMode.evaluate(cpu, operand);
+                cpu.X = value;
+                cpu.setFlags(value);
+            }
+        });
+    }
+}
+
+class LDY extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'LDY',
+            description: 'Load the Y registry',
+            implementation: (cpu, operand) => {
+                let value = addressMode.evaluate(cpu, operand);
+                cpu.Y = value;
+                cpu.setFlags(value);
+            }
+        });
+    }
+}
+
 class LSR extends Instruction { }
 class NOP extends Instruction { }
 class ORA extends Instruction {
@@ -599,6 +627,7 @@ class STA extends Instruction {
         });
     }
 }
+
 class STX extends Instruction { }
 class STY extends Instruction { }
 class TAX extends Instruction { }
