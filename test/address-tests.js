@@ -1,6 +1,6 @@
 import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
-let should = chai.should();
+const should = chai.should();
 
 import { Address } from '../libs/6502';
 
@@ -14,7 +14,7 @@ describe('Address', () => {
 
         it('builds a 0..65535 address', () => {
             [0, 1, 50, 127, 128, 255, 256, 32767, 32768, 65535].forEach(value => {
-                let address = new Address(value);
+                const address = new Address(value);
                 address.should.equal(value, `Value ${value} as an address should evaluate as that same number.`);
             });
         });
@@ -35,7 +35,7 @@ describe('Address', () => {
                 [32768, '$8000'],
                 [65535, '$FFFF']
             ].forEach(([value, formattedString]) => {
-                let byte = new Address(value);
+                const byte = new Address(value);
                 byte.toString().should.equal(formattedString);
             });
         });

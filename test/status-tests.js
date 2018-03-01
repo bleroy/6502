@@ -1,6 +1,6 @@
 import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
-let should = chai.should();
+const should = chai.should();
 
 import MCS6502, {} from '../libs/6502';
 
@@ -9,7 +9,7 @@ const NO_BIT = 0x20, C_BIT = 0x01, Z_BIT = 0x02, I_BIT = 0x04,
 
 describe('status register', () => {
     it('can write flags', () => {
-        let cpu = new MCS6502();
+        const cpu = new MCS6502();
 
         // By default, no flags are set, but bit 5 is always set.
         cpu.SR.should.equal(0x20);
@@ -58,7 +58,7 @@ describe('status register', () => {
     });
 
     it('can read flags', () => {
-        let cpu = new MCS6502();
+        const cpu = new MCS6502();
 
         cpu.C.should.be.false;
         cpu.Z.should.be.false;

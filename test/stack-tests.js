@@ -1,12 +1,12 @@
 import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
-let should = chai.should();
+const should = chai.should();
 
 import MCS6502 from '../libs/6502';
 
 describe('stack', () => {
     it('can push and pull', () => {
-        let cpu = new MCS6502();
+        const cpu = new MCS6502();
 
         cpu.push(0x13);
         cpu.pull().should.equal(0x13);
@@ -24,7 +24,7 @@ describe('stack', () => {
     });
 
     it('pushes to page 1', () => {
-        let cpu = new MCS6502();
+        const cpu = new MCS6502();
 
         cpu.SP.should.equal(0xFF);
         cpu.peek(0x1FF).should.equal(0x00);
@@ -70,7 +70,7 @@ describe('stack', () => {
     });
 
     it('wraps pushes around the stack top', () => {
-        let cpu = new MCS6502({SP: 0x01});
+        const cpu = new MCS6502({SP: 0x01});
 
         cpu.push(0x01);
         cpu.peek(0x101).should.equal(0x01);
@@ -86,7 +86,7 @@ describe('stack', () => {
     });
 
     it('pulls from stack memory', () => {
-        let cpu = new MCS6502({SP: 0xF9});
+        const cpu = new MCS6502({SP: 0xF9});
         cpu.poke(0x1FF, 0x06);
         cpu.poke(0x1FE, 0x05);
         cpu.poke(0x1FD, 0x04);
@@ -114,7 +114,7 @@ describe('stack', () => {
     });
 
     it('wraps pulls around the bottom of the stack', () => {
-        let cpu = new MCS6502({SP: 0xFE});
+        const cpu = new MCS6502({SP: 0xFE});
         cpu.poke(0x1FF, 0x01);
         cpu.poke(0x100, 0x02);
         cpu.poke(0x101, 0x03);
@@ -134,7 +134,7 @@ describe('stack', () => {
     });
 
     it('can peek into the stack', () => {
-        let cpu = new MCS6502({SP: 0x01});
+        const cpu = new MCS6502({SP: 0x01});
 
         cpu.push(0x01);
         cpu.stackPeek().should.equal(0x01);

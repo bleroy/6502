@@ -1,18 +1,18 @@
 import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
-let should = chai.should();
+const should = chai.should();
 
 import MCS6502, { AddressMode, AddressModes, Address, Byte } from '../libs/6502';
 
 describe('AddressMode', () => {
     describe('constructor', () => {
         it('properly sets properties', () => {
-            let parameters = {
+            const parameters = {
                 name: "the name",
                 description: "the description",
                 bytes: 42
             };
-            let addressMode = new AddressMode(parameters);
+            const addressMode = new AddressMode(parameters);
 
             addressMode.should.include(parameters);
         });
@@ -20,10 +20,10 @@ describe('AddressMode', () => {
 
     describe('evaluate', () => {
         it('evaluates addresses from memory', () => {
-            let proc = new MCS6502();
+            const proc = new MCS6502();
             proc.poke(1000, 42);
 
-            let mode = new AddressMode({
+            const mode = new AddressMode({
                 evaluate: (processor, operand) => new Address(operand)
             });
 
@@ -31,9 +31,9 @@ describe('AddressMode', () => {
         });
 
         it('evaluates bytes directly', () => {
-            let proc = new MCS6502();
+            const proc = new MCS6502();
 
-            let mode = new AddressMode({
+            const mode = new AddressMode({
                 evaluate: (processor, operand) => operand + 2
             });
 
@@ -43,9 +43,9 @@ describe('AddressMode', () => {
 
     describe('evaluateAddress', () => {
         it('throws if evaluation didn\'t return an address', () => {
-            let proc = new MCS6502();
+            const proc = new MCS6502();
 
-            let mode = new AddressMode({
+            const mode = new AddressMode({
                 evaluate: (processor, operand) => 0
             });
 
@@ -54,9 +54,9 @@ describe('AddressMode', () => {
         });
 
         it('returns the evaluation when it\'s an address', () => {
-            let proc = new MCS6502();
+            const proc = new MCS6502();
 
-            let mode = new AddressMode({
+            const mode = new AddressMode({
                 evaluate: (processor, operand) => new Address(operand)
             });
 
@@ -68,7 +68,7 @@ describe('AddressMode', () => {
 describe('AddressModes', () => {
     describe('Accumulator', () => {
         it('evaluates the value of the accumulator', () => {
-            let proc = new MCS6502({ A: 42 });
+            const proc = new MCS6502({ A: 42 });
             AddressModes.A.evaluate(proc).should.equal(42);
         });
 
@@ -79,9 +79,9 @@ describe('AddressModes', () => {
 
     describe('Absolute', () => {
         it('evaluates as the byte at an absolute address', () => {
-            let proc = new MCS6502();
+            const proc = new MCS6502();
             proc.poke(1000, 42);
-            let val = AddressModes.abs.evaluate(proc, 1000);
+            const val = AddressModes.abs.evaluate(proc, 1000);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
@@ -94,9 +94,9 @@ describe('AddressModes', () => {
 
     describe('Absolute, X-indexed', () => {
         it('evaluates as the byte at an absolute address, indexed with X', () => {
-            let proc = new MCS6502({ X: 30 });
+            const proc = new MCS6502({ X: 30 });
             proc.poke(1000, 42);
-            let val = AddressModes.absX.evaluate(proc, 970);
+            const val = AddressModes.absX.evaluate(proc, 970);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
@@ -109,9 +109,9 @@ describe('AddressModes', () => {
 
     describe('Absolute, Y-indexed', () => {
         it('evaluates as the byte at an absolute address, indexed with Y', () => {
-            let proc = new MCS6502({ Y: 30 });
+            const proc = new MCS6502({ Y: 30 });
             proc.poke(1000, 42);
-            let val = AddressModes.absY.evaluate(proc, 970);
+            const val = AddressModes.absY.evaluate(proc, 970);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
@@ -124,7 +124,7 @@ describe('AddressModes', () => {
 
     describe('Immediate', () => {
         it('evaluates as the byte passed in', () => {
-            let val = AddressModes.immediate.evaluate(null, 42);
+            const val = AddressModes.immediate.evaluate(null, 42);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
@@ -137,7 +137,7 @@ describe('AddressModes', () => {
 
     describe('Implied', () => {
         it('evaluates as null', () => {
-            let val = AddressModes.implied.evaluate();
+            const val = AddressModes.implied.evaluate();
 
             expect(val).to.be.null;
         });
@@ -149,11 +149,11 @@ describe('AddressModes', () => {
 
     describe('Indirect', () => {
         it('evaluates an address as the LSB-MSB address in memory at the address specified', () => {
-            let proc = new MCS6502();
+            const proc = new MCS6502();
             proc.poke(1000, 0xD0);
             proc.poke(1001, 0x07);
 
-            let val = AddressModes.indirect.evaluateAddress(proc, 1000);
+            const val = AddressModes.indirect.evaluateAddress(proc, 1000);
 
             (val instanceof Address).should.be.true;
             val.should.equal(0x07D0);
@@ -166,19 +166,19 @@ describe('AddressModes', () => {
 
     describe('X-indexed, indirect', () => {
         it('evaluates as the byte at the LSB-MSB address pointed to by the 0-page address specified, indexed by X', () => {
-            let proc = new MCS6502({X: 5});
+            const proc = new MCS6502({X: 5});
             proc.poke(0x43, 0x15);
             proc.poke(0x44, 0x24);
             proc.poke(0x2415, 42);
 
-            let val = AddressModes.Xind.evaluate(proc, 0x3E);
+            const val = AddressModes.Xind.evaluate(proc, 0x3E);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
         it('wraps around the 0 page', () => {
-            let proc = new MCS6502({X: 5});
+            const proc = new MCS6502({X: 5});
             proc.poke(0xFF, 0x15);
             proc.poke(0x00, 0x24);
             proc.poke(0x2415, 42);
@@ -205,24 +205,24 @@ describe('AddressModes', () => {
 
     describe('Indirect, Y-indexed', () => {
         it('evaluates as the byte at the Y-indexed LSB-MSB address pointed to by the 0-page address specified', () => {
-            let proc = new MCS6502({Y: 5});
+            const proc = new MCS6502({Y: 5});
             proc.poke(0x43, 0x15);
             proc.poke(0x44, 0x24);
             proc.poke(0x241A, 42);
 
-            let val = AddressModes.indY.evaluate(proc, 0x43);
+            const val = AddressModes.indY.evaluate(proc, 0x43);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
         it('wraps around the 0 page', () => {
-            let proc = new MCS6502({Y: 5});
+            const proc = new MCS6502({Y: 5});
             proc.poke(0xFF, 0x15);
             proc.poke(0x00, 0x24);
             proc.poke(0x241A, 42);
 
-            let val = AddressModes.indY.evaluate(proc, 0xFF);
+            const val = AddressModes.indY.evaluate(proc, 0xFF);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
@@ -235,18 +235,18 @@ describe('AddressModes', () => {
 
     describe('Relative', () => {
         it('evaluates as the PC plus the argument for a negative offset', () => {
-            let proc = new MCS6502({PC: 0x202});
+            const proc = new MCS6502({PC: 0x202});
 
-            let val = AddressModes.rel.evaluateAddress(proc, -0x50);
+            const val = AddressModes.rel.evaluateAddress(proc, -0x50);
 
             (val instanceof Address).should.be.true;
             val.should.equal(0x1B2);
         });
 
         it('evaluates as the PC plus the argument for a positive offset', () => {
-            let proc = new MCS6502({PC: 0x2E2});
+            const proc = new MCS6502({PC: 0x2E2});
 
-            let val = AddressModes.rel.evaluateAddress(proc, 0x50);
+            const val = AddressModes.rel.evaluateAddress(proc, 0x50);
 
             (val instanceof Address).should.be.true;
             val.should.equal(0x332);
@@ -260,9 +260,9 @@ describe('AddressModes', () => {
 
     describe('Zero page', () => {
         it('evaluates as the byte in page zerobeing pointed to', () => {
-            let proc = new MCS6502();
+            const proc = new MCS6502();
             proc.poke(10, 42);
-            let val = AddressModes.zpg.evaluate(proc, 10);
+            const val = AddressModes.zpg.evaluate(proc, 10);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
@@ -275,19 +275,19 @@ describe('AddressModes', () => {
 
     describe('Zero page, X-indexed', () => {
         it('evaluates as the byte at an absolute zero page address, indexed with X', () => {
-            let proc = new MCS6502({ X: 30 });
+            const proc = new MCS6502({ X: 30 });
             proc.poke(40, 42);
-            let val = AddressModes.zpgX.evaluate(proc, 10);
+            const val = AddressModes.zpgX.evaluate(proc, 10);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
         it('wraps around the 0 page', () => {
-            let proc = new MCS6502({Y: 5});
+            const proc = new MCS6502({Y: 5});
             proc.poke(0x04, 42);
 
-            let val = AddressModes.zpgY.evaluate(proc, 0xFF);
+            const val = AddressModes.zpgY.evaluate(proc, 0xFF);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
@@ -300,19 +300,19 @@ describe('AddressModes', () => {
 
     describe('Zero page, Y-indexed', () => {
         it('evaluates as the byte at an absolute zero page address, indexed with Y', () => {
-            let proc = new MCS6502({ Y: 30 });
+            const proc = new MCS6502({ Y: 30 });
             proc.poke(40, 42);
-            let val = AddressModes.zpgY.evaluate(proc, 10);
+            const val = AddressModes.zpgY.evaluate(proc, 10);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);
         });
 
         it('wraps around the 0 page', () => {
-            let proc = new MCS6502({X: 5});
+            const proc = new MCS6502({X: 5});
             proc.poke(0x04, 42);
 
-            let val = AddressModes.zpgX.evaluate(proc, 0xFF);
+            const val = AddressModes.zpgX.evaluate(proc, 0xFF);
 
             (val instanceof Address).should.be.false;
             val.should.equal(42);

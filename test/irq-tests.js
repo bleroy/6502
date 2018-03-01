@@ -1,12 +1,12 @@
 import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
-let should = chai.should();
+const should = chai.should();
 
 import MCS6502, { } from '../libs/6502';
 
 describe('Interruptions', () => {
     it('can trigger interruptions', () => {
-        let cpu = new MCS6502();
+        const cpu = new MCS6502();
 
         // Set the IRQ vector
         cpu.poke(0xFFFE, 0x34);

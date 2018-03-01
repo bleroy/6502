@@ -1,20 +1,20 @@
 import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
-let should = chai.should();
+const should = chai.should();
 
 import MCS6502, { Instruction, AddressModes, Address } from '../libs/6502';
 
 describe('Instruction', () => {
     describe('constructor', () => {
         it('properly sets properties', () => {
-            let parameters = {
+            const parameters = {
                 mnemonic: "ABC",
                 opCode: 42,
                 description: "the description",
                 implementation: (proc, operand) => 3,
                 addressMode: AddressModes.A
             };
-            let instruction = new Instruction(parameters);
+            const instruction = new Instruction(parameters);
 
             instruction.should.include(parameters);
         });
@@ -26,7 +26,7 @@ describe('Instruction', () => {
             let processorName = null;
             let operandValue = null;
 
-            let instruction = new Instruction({
+            const instruction = new Instruction({
                 implementation: (proc, operand) => {
                     implementationCalled = true;
                     processorName = proc.name;
@@ -35,7 +35,7 @@ describe('Instruction', () => {
                 }
             });
 
-            let cycles = instruction.execute(new MCS6502(), 42);
+            const cycles = instruction.execute(new MCS6502(), 42);
 
             implementationCalled.should.be.true;
             processorName.should.equal('6502');
@@ -46,11 +46,11 @@ describe('Instruction', () => {
 
     describe('disassemble', () => {
         it("disassembles instructions to source code", () => {
-            let instruction = new Instruction({
+            const instruction = new Instruction({
                 mnemonic: 'ABC',
                 addressMode: AddressModes.indirect
             });
-            let disassembled = instruction.disassemble(0x423F);
+            const disassembled = instruction.disassemble(0x423F);
 
             disassembled.should.equal('ABC ($423F)');
         });
@@ -60,7 +60,7 @@ describe('Instruction', () => {
 describe("instructions", () => {
     describe("LDA", () => {
         it("loads the accumulator", () => {
-            let cpu = new MCS6502();
+            const cpu = new MCS6502();
 
             cpu.poke(0x200,
                 0xA9, 0x12, // LDA #$12
@@ -93,7 +93,7 @@ describe("instructions", () => {
 
     describe("LDX", () => {
         it("loads the X register", () => {
-            let cpu = new MCS6502();
+            const cpu = new MCS6502();
 
             cpu.poke(0x200,
                 0xA2, 0x12, // LDX #$12
@@ -126,7 +126,7 @@ describe("instructions", () => {
 
     describe("LDY", () => {
         it("loads the Y register", () => {
-            let cpu = new MCS6502();
+            const cpu = new MCS6502();
 
             cpu.poke(0x200,
                 0xA0, 0x12, // LDY #$12
@@ -159,7 +159,7 @@ describe("instructions", () => {
 
     describe("ADC", () => {
         it("agrees 0 + 1 = 1", () => {
-            let cpu = new MCS6502();
+            const cpu = new MCS6502();
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -172,7 +172,7 @@ describe("instructions", () => {
         });
 
         it("finds 127 + 1 = -128 with overflow", () => {
-            let cpu = new MCS6502({ A: 0x7F });
+            const cpu = new MCS6502({ A: 0x7F });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -184,7 +184,7 @@ describe("instructions", () => {
         });
 
         it("agrees -128 + 1 = -127", () => {
-            let cpu = new MCS6502({ A: 0x80 });
+            const cpu = new MCS6502({ A: 0x80 });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -197,7 +197,7 @@ describe("instructions", () => {
         });
 
         it("agrees -1 + 1 = 0", () => {
-            let cpu = new MCS6502({ A: 0xFF });
+            const cpu = new MCS6502({ A: 0xFF });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -210,7 +210,7 @@ describe("instructions", () => {
         });
 
         it("agrees 0 - 1 = -1", () => {
-            let cpu = new MCS6502();
+            const cpu = new MCS6502();
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
@@ -223,7 +223,7 @@ describe("instructions", () => {
         });
 
         it("agrees 127 - 1 = 126", () => {
-            let cpu = new MCS6502({ A: 0x7F });
+            const cpu = new MCS6502({ A: 0x7F });
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
@@ -236,7 +236,7 @@ describe("instructions", () => {
         });
 
         it("finds -128 - 1 = 127 with overflow", () => {
-            let cpu = new MCS6502({ A: 0x80 });
+            const cpu = new MCS6502({ A: 0x80 });
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
@@ -249,7 +249,7 @@ describe("instructions", () => {
         });
 
         it("agrees -1 - 1 = -2", () => {
-            let cpu = new MCS6502({ A: 0xFF });
+            const cpu = new MCS6502({ A: 0xFF });
 
             cpu.poke(0x200, 0x69, 0xFF); // ADC #$FF
             cpu.step();
@@ -262,7 +262,7 @@ describe("instructions", () => {
         });
 
         it("includes the carry", () => {
-            let cpu = new MCS6502({ C: true });
+            const cpu = new MCS6502({ C: true });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -275,7 +275,7 @@ describe("instructions", () => {
         });
 
         it("finds 1 + 1 = 2 also in decimal", () => {
-            let cpu = new MCS6502({ A: 0x01, D: true });
+            const cpu = new MCS6502({ A: 0x01, D: true });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -288,7 +288,7 @@ describe("instructions", () => {
         });
 
         it("finds 49 + 1 = 50 in decimal", () => {
-            let cpu = new MCS6502({ A: 0x49, D: true });
+            const cpu = new MCS6502({ A: 0x49, D: true });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -301,7 +301,7 @@ describe("instructions", () => {
         });
 
         it("finds 50 + 1 = 51 in decimal", () => {
-            let cpu = new MCS6502({ A: 0x50, D: true });
+            const cpu = new MCS6502({ A: 0x50, D: true });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -314,7 +314,7 @@ describe("instructions", () => {
         });
 
         it("finds 99 + 1 = 0 with a carry in decimal", () => {
-            let cpu = new MCS6502({ A: 0x99, D: true });
+            const cpu = new MCS6502({ A: 0x99, D: true });
 
             cpu.poke(0x200, 0x69, 0x01); // ADC #$01
             cpu.step();
@@ -327,7 +327,7 @@ describe("instructions", () => {
         });
 
         it("finds 0 + 99 = 99 in decimal", () => {
-            let cpu = new MCS6502({ D: true });
+            const cpu = new MCS6502({ D: true });
 
             cpu.poke(0x200, 0x69, 0x99); // ADC #$99
             cpu.step();
@@ -340,7 +340,7 @@ describe("instructions", () => {
         });
 
         it("finds 49 + 99 = 48 with carry in decimal", () => {
-            let cpu = new MCS6502({ A: 0x49, D: true });
+            const cpu = new MCS6502({ A: 0x49, D: true });
 
             cpu.poke(0x200, 0x69, 0x99); // ADC #$99
             cpu.step();
@@ -353,7 +353,7 @@ describe("instructions", () => {
         });
 
         it("finds 50 + 99 = 49 with carry in decimal", () => {
-            let cpu = new MCS6502({ A: 0x50, D: true });
+            const cpu = new MCS6502({ A: 0x50, D: true });
 
             cpu.poke(0x200, 0x69, 0x99); // ADC #$99
             cpu.step();
@@ -368,7 +368,7 @@ describe("instructions", () => {
 
     describe("ORA", () => {
         it("does bitwise OR operations on the accumulator", () => {
-            let cpu = new MCS6502();
+            const cpu = new MCS6502();
 
             cpu.poke(0x200,
                 0x09, 0x00, // ORA #$00
@@ -407,7 +407,7 @@ describe("instructions", () => {
 
     describe("AND", () => {
         it("does bitwise AND operations on the accumulator", () => {
-            let cpu = new MCS6502();
+            const cpu = new MCS6502();
 
             cpu.poke(0x200,
                 0x29, 0x00, // AND #$00
@@ -454,7 +454,7 @@ describe("instructions", () => {
 
     describe("EOR", () => {
         it("does bitwise EOR operations on the accumulator", () => {
-            let cpu = new MCS6502({ A: 0x88 });
+            const cpu = new MCS6502({ A: 0x88 });
 
             cpu.poke(0x200,
                 0x49, 0x00, // EOR #$00

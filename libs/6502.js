@@ -13,8 +13,8 @@ const aSymbol = Symbol('a'), xSymbol = Symbol('x'), ySymbol = Symbol('y'),
  * It's possible to add to and remove functions from the delegate.
  * @param {Array} array - a list of functions to execute sequentially. Optional.
  */
-export let delegate = (...array) => {
-    let result = (...args) => {
+export const delegate = (...array) => {
+    const result = (...args) => {
         array.forEach(h => {
             if (result.filter(h.param)) h(...args);
         });
@@ -159,7 +159,7 @@ export class Ram {
      * @param {Number} bytes The bytes to write to memory. 
      */
     poke(address, ...bytes) {
-        let addr = address.valueOf();
+        const addr = address.valueOf();
         for (let i = 0; i < bytes.length; i++) {
             this[memorySymbol][addr + i] = bytes[i];
         }
@@ -229,7 +229,7 @@ export class AddressMode {
      * @returns {Number} - the evaluated result.
      */
     evaluate(cpu, operand) {
-        let evaluation = this.evaluateInternal(cpu, operand);
+        const evaluation = this.evaluateInternal(cpu, operand);
         return evaluation instanceof Address ? cpu.peek(evaluation) : evaluation;
     }
 
@@ -241,7 +241,7 @@ export class AddressMode {
      * @returns {Address} - the evaluated address.
      */
     evaluateAddress(cpu, operand) {
-        let evaluation = this.evaluateInternal(cpu, operand);
+        const evaluation = this.evaluateInternal(cpu, operand);
         if (!(evaluation instanceof Address)) throw new TypeError('Result of address mode evaluation is not an address');
         return evaluation;
     }
@@ -250,7 +250,7 @@ export class AddressMode {
 /**
  * An object containing implementations for all of a 6502's address modes
  */
-export let AddressModes = {
+export const AddressModes = {
     A: new AddressMode({
         name: 'A',
         description: 'Accumulator',
@@ -408,18 +408,18 @@ export class Instruction {
  */
 export function* disassemble(cpu, address) {
     while (address < 0xFFFF) {
-        let opCode = cpu.peek(address);
-        let instruction = cpu.instructionSet.get(opCode);
+        const opCode = cpu.peek(address);
+        const instruction = cpu.instructionSet.get(opCode);
         if (!instruction || instruction instanceof InvalidInstruction) {
             yield `${address.valueOf().toString(16).toUpperCase().padStart(4, '0')}          *** # Unknown opCode ${Byte.toString(opCode)}`;
             continue;
         }
-        let addressMode = instruction.addressMode;
-        let operand =
+        const addressMode = instruction.addressMode;
+        const operand =
             addressMode.bytes == 0 ? null :
                 addressMode.bytes == 1 ? cpu.peek(address + 1) :
                     cpu.addressAt(address + 1);
-        let memoryDump = (
+        const memoryDump = (
             address.toString(16).toUpperCase().padStart(4, '0') + ' ' +
             opCode.toString(16).toUpperCase().padStart(2, '0') + ' ' +
             (addressMode.bytes > 0 ?
@@ -442,8 +442,8 @@ class ADC extends Instruction {
             mnemonic: 'ADC',
             description: 'Add with carry',
             implementation: (cpu, operand) => {
-                let oldA = cpu.A;
-                let val = addressMode.evaluate(cpu, operand);
+                const oldA = cpu.A;
+                const val = addressMode.evaluate(cpu, operand);
                 let sum = oldA + val + (cpu.C ? 1 : 0);
                 // console.log(`ADC: A=${oldA}, sum=${sum}`);
                 if (cpu.D) {
@@ -475,7 +475,7 @@ class AND extends Instruction {
             mnemonic: 'AND',
             description: 'Bitwise AND with the accumulator',
             implementation: (cpu, operand) => {
-                let value = addressMode.evaluate(cpu, operand);
+                const value = addressMode.evaluate(cpu, operand);
                 cpu.A &= value;
                 cpu.setFlags(cpu.A);
             }
@@ -521,8 +521,8 @@ class CMP extends Instruction {
             mnemonic: 'CMP',
             description: 'Compare with the accumulator',
             implementation: (cpu, operand) => {
-                let value = addressMode.evaluate(cpu, operand);
-                let diff = (cpu.A - value) & 0xFF;
+                const value = addressMode.evaluate(cpu, operand);
+                const diff = (cpu.A - value) & 0xFF;
                 cpu.C = cpu.A >= value;
                 cpu.setFlags(diff);
             }
@@ -537,8 +537,8 @@ class CPX extends Instruction {
             mnemonic: 'CPX',
             description: 'Compare with the X register',
             implementation: (cpu, operand) => {
-                let value = addressMode.evaluate(cpu, operand);
-                let diff = (cpu.X - value) & 0xFF;
+                const value = addressMode.evaluate(cpu, operand);
+                const diff = (cpu.X - value) & 0xFF;
                 cpu.C = cpu.X >= value;
                 cpu.setFlags(diff);
             }
@@ -553,8 +553,8 @@ class CPY extends Instruction {
             mnemonic: 'CPY',
             description: 'Compare with the Y register',
             implementation: (cpu, operand) => {
-                let value = addressMode.evaluate(cpu, operand);
-                let diff = (cpu.Y - value) & 0xFF;
+                const value = addressMode.evaluate(cpu, operand);
+                const diff = (cpu.Y - value) & 0xFF;
                 cpu.C = cpu.Y >= value;
                 cpu.setFlags(diff);
             }
@@ -573,7 +573,7 @@ class EOR extends Instruction {
             mnemonic: 'EOR',
             description: 'Bitwise EOR with the accumulator',
             implementation: (cpu, operand) => {
-                let value = addressMode.evaluate(cpu, operand);
+                const value = addressMode.evaluate(cpu, operand);
                 cpu.A ^= value;
                 cpu.setFlags(cpu.A);
             }
@@ -594,7 +594,7 @@ class LDA extends Instruction {
             mnemonic: 'LDA',
             description: 'Load accumulator',
             implementation: (cpu, operand) => {
-                let value = addressMode.evaluate(cpu, operand);
+                const value = addressMode.evaluate(cpu, operand);
                 cpu.A = value;
                 cpu.setFlags(value);
             }
@@ -609,7 +609,7 @@ class LDX extends Instruction {
             mnemonic: 'LDX',
             description: 'Load the X registry',
             implementation: (cpu, operand) => {
-                let value = addressMode.evaluate(cpu, operand);
+                const value = addressMode.evaluate(cpu, operand);
                 cpu.X = value;
                 cpu.setFlags(value);
             }
@@ -624,7 +624,7 @@ class LDY extends Instruction {
             mnemonic: 'LDY',
             description: 'Load the Y registry',
             implementation: (cpu, operand) => {
-                let value = addressMode.evaluate(cpu, operand);
+                const value = addressMode.evaluate(cpu, operand);
                 cpu.Y = value;
                 cpu.setFlags(value);
             }
@@ -641,7 +641,7 @@ class ORA extends Instruction {
             mnemonic: 'ORA',
             description: 'Bitwise OR with the accumulator',
             implementation: (cpu, operand) => {
-                let value = addressMode.evaluate(cpu, operand);
+                const value = addressMode.evaluate(cpu, operand);
                 cpu.A |= value;
                 cpu.setFlags(cpu.A);
             }
@@ -697,7 +697,7 @@ class InvalidInstruction extends Instruction {
     }
 }
 
-let NoInstruction = new InvalidInstruction();
+const NoInstruction = new InvalidInstruction();
 
 /**
  * An instruction set
@@ -722,7 +722,7 @@ export class InstructionSet {
     get(opCode) { return this[instructionSetSymbol][opCode] || NoInstruction; }
 }
 
-let mcs6502InstructionSet = new InstructionSet(
+const mcs6502InstructionSet = new InstructionSet(
     new BRK({ opCode: 0x00, addressMode: AddressModes.implied }),
     new ORA({ opCode: 0x01, addressMode: AddressModes.Xind }),
     new ORA({ opCode: 0x05, addressMode: AddressModes.zpg }),
@@ -904,9 +904,9 @@ export default class MCS6502 {
         this[aHandlersSymbol] = delegate();
         this[xHandlersSymbol] = delegate();
         this[yHandlersSymbol] = delegate();
-        let breakpoints = delegate();
+        const breakpoints = delegate();
         breakpoints.filter = (param) => {
-            let predicate = param.predicate || (() => true);
+            const predicate = param.predicate || (() => true);
             return ((!param.address || this.pc === param.address) && predicate(param));
         };
         this[breakpointsSymbol] = breakpoints
@@ -1187,10 +1187,10 @@ export default class MCS6502 {
      * Executes the instruction at the PC, then moves PC to the next instruction
      */
     step() {
-        let opCode = this.peek(this.PC);
-        let instruction = this[instructionSetSymbol].get(opCode);
-        let bytes = instruction.addressMode.bytes;
-        let operand = bytes == 0 ? null
+        const opCode = this.peek(this.PC);
+        const instruction = this[instructionSetSymbol].get(opCode);
+        const bytes = instruction.addressMode.bytes;
+        const operand = bytes == 0 ? null
             : bytes == 1 ? this.peek(this.PC + 1)
                 : this.addressAt(this.PC + 1);
         // console.log(`Executing ${instruction.mnemonic} with operand ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);

@@ -1,6 +1,6 @@
 import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
-let should = chai.should();
+const should = chai.should();
 
 import MCS6502, { disassemble, Ram, Instruction, AddressMode, Address, Byte, InstructionSet } from '../libs/6502';
 
@@ -10,34 +10,34 @@ class CAT extends Instruction {
     }
 }
 
-let noOperandAddressMode = new AddressMode({
+const noOperandAddressMode = new AddressMode({
     name: 'mode0',
     description: 'Fake no-operand address mode',
     disassemble: () => '{nope}',
     bytes: 0
 });
 
-let byteOperandAddressMode = new AddressMode({
+const byteOperandAddressMode = new AddressMode({
     name: 'mode1',
     description: 'Fake single byte operand address mode',
     disassemble: operand => `#${Byte.toString(operand)}`,
     bytes: 1
 });
 
-let addressOperandAddressMode = new AddressMode({
+const addressOperandAddressMode = new AddressMode({
     name: 'mode2',
     description: 'Fake two-byte operand address mode',
     disassemble: address => `${new Address(address).toString()}`,
     bytes: 2
 });
 
-let CATno = new CAT(0x02, noOperandAddressMode);
-let CATbyte = new CAT(0x03, byteOperandAddressMode);
-let CATaddress = new CAT(0x04, addressOperandAddressMode);
+const CATno = new CAT(0x02, noOperandAddressMode);
+const CATbyte = new CAT(0x03, byteOperandAddressMode);
+const CATaddress = new CAT(0x04, addressOperandAddressMode);
 
 describe('Disassembler', () => {
     it("Disassembles all lengths of address modes", () => {
-        let processor = new MCS6502({
+        const processor = new MCS6502({
             instructionSet: new InstructionSet(CATno, CATbyte, CATaddress),
             memory: new Ram([
                 0x02,
@@ -52,7 +52,7 @@ describe('Disassembler', () => {
             ])
         });
 
-        let gen = disassemble(processor, 0);
+        const gen = disassemble(processor, 0);
 
         gen.next().value.should.equal("0000 02       CAT {nope}");
         gen.next().value.should.equal("0001 03 FF    CAT #$FF");

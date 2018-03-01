@@ -1,6 +1,6 @@
 import { describe, it } from 'mocha';
 import chai, { expect } from 'chai';
-let should = chai.should();
+const should = chai.should();
 
 import { Byte } from '../libs/6502';
 
@@ -26,7 +26,7 @@ describe('Byte', () => {
                 [ 128, 0x80],
                 [ 255, 0xFF]
             ].forEach(([signedValue, unsignedValue]) => {
-                let byte = Byte.fromNumber(signedValue);
+                const byte = Byte.fromNumber(signedValue);
                 byte.should.equal(unsignedValue, `Value ${signedValue} should create value ${unsignedValue}, but was ${byte}.`);
             });
         });
