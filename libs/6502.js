@@ -513,9 +513,55 @@ class CLC extends Instruction { }
 class CLD extends Instruction { }
 class CLI extends Instruction { }
 class CLV extends Instruction { }
-class CMP extends Instruction { }
-class CPX extends Instruction { }
-class CPY extends Instruction { }
+
+class CMP extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'CMP',
+            description: 'Compare with the accumulator',
+            implementation: (cpu, operand) => {
+                let value = addressMode.evaluate(cpu, operand);
+                let diff = (cpu.A - value) & 0xFF;
+                cpu.C = cpu.A >= value;
+                cpu.setFlags(diff);
+            }
+        })
+    }
+}
+
+class CPX extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'CPX',
+            description: 'Compare with the X register',
+            implementation: (cpu, operand) => {
+                let value = addressMode.evaluate(cpu, operand);
+                let diff = (cpu.X - value) & 0xFF;
+                cpu.C = cpu.X >= value;
+                cpu.setFlags(diff);
+            }
+        })
+    }
+}
+
+class CPY extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'CPY',
+            description: 'Compare with the Y register',
+            implementation: (cpu, operand) => {
+                let value = addressMode.evaluate(cpu, operand);
+                let diff = (cpu.Y - value) & 0xFF;
+                cpu.C = cpu.Y >= value;
+                cpu.setFlags(diff);
+            }
+        })
+    }
+}
+
 class DEC extends Instruction { }
 class DEX extends Instruction { }
 class DEY extends Instruction { }
