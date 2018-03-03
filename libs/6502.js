@@ -450,7 +450,7 @@ class ADC extends Instruction {
                     if (((oldA & 0xF) + (val & 0xF) + (cpu.C ? 1 : 0)) > 9) {
                         sum += 6;
                     }
-                    if (sum > 0x99) sum += 96;
+                    if (sum > 0x99) sum += 0x60;
                     cpu.N = false;
                     cpu.V = false;
                     cpu.C = sum > 0x99;
@@ -656,7 +656,39 @@ class ROL extends Instruction { }
 class ROR extends Instruction { }
 class RTI extends Instruction { }
 class RTS extends Instruction { }
-class SBC extends Instruction { }
+
+class SBC extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'SBC',
+            description: 'Subtract with carry',
+            implementation: (cpu, operand) => {
+                const oldA = cpu.A;
+                const val = addressMode.evaluate(cpu, operand);
+                let diff = (oldA - val - (cpu.C ? 0 : 1)) & 0xFFF;
+                // console.log(`SBC: A=${oldA}, sum=${sum}`);
+                if (cpu.D) {
+                    if (((oldA & 0xF) - (cpu.C ? 0 : 1)) < (val & 0x0F)) {
+                        diff -= 6;
+                    }
+                    if (diff > 0x99) diff -= 0x60;
+                    cpu.N = false;
+                    cpu.V = false;
+                }
+                else {
+                    cpu.N = (diff & 0x80) != 0;
+                    cpu.V = ((oldA ^ val) & 0x80) && ((oldA ^ diff) & 0x80);
+                }
+                cpu.C = diff < 0x100;
+                diff &= 0xFF;
+                cpu.Z = diff == 0;
+                cpu.A = diff;
+            }
+        });
+    }
+}
+
 class SEC extends Instruction { }
 class SED extends Instruction { }
 class SEI extends Instruction { }
