@@ -40,5 +40,7 @@
     "chai": "^4.1.2",
     "mocha": "^4.1.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "npm": "^5.7.1"
+  }
 }
