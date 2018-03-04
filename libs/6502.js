@@ -798,8 +798,37 @@ class STA extends Instruction {
 
 class STX extends Instruction { }
 class STY extends Instruction { }
-class TAX extends Instruction { }
-class TAY extends Instruction { }
+
+class TAX extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xAA,
+            addressMode: AddressModes.implied,
+            mnemonic: 'TAX',
+            description: 'Transfer A to X',
+            implementation: (cpu, operand) => {
+                cpu.X = cpu.A;
+                cpu.setFlags(cpu.X);
+            }
+        });
+    }
+}
+
+class TAY extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xA8,
+            addressMode: AddressModes.implied,
+            mnemonic: 'TAY',
+            description: 'Transfer A to Y',
+            implementation: (cpu, operand) => {
+                cpu.Y = cpu.A;
+                cpu.setFlags(cpu.Y);
+            }
+        });
+    }
+}
+
 class TSX extends Instruction { }
 class TXA extends Instruction { }
 class TXS extends Instruction { }
@@ -941,9 +970,9 @@ const mcs6502InstructionSet = new InstructionSet(
     new LDY({ opCode: 0xA4, addressMode: AddressModes.zpg }),
     new LDA({ opCode: 0xA5, addressMode: AddressModes.zpg }),
     new LDX({ opCode: 0xA6, addressMode: AddressModes.zpg }),
-    new TAY({ opCode: 0xA8, addressMode: AddressModes.implied }),
+    new TAY(),
     new LDA({ opCode: 0xA9, addressMode: AddressModes.immediate }),
-    new TAX({ opCode: 0xAA, addressMode: AddressModes.implied }),
+    new TAX(),
     new LDY({ opCode: 0xAC, addressMode: AddressModes.abs }),
     new LDA({ opCode: 0xAD, addressMode: AddressModes.abs }),
     new LDX({ opCode: 0xAE, addressMode: AddressModes.abs }),
