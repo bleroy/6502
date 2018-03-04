@@ -468,7 +468,7 @@ class ADC extends Instruction {
     }
 }
 
-class AND extends Instruction { 
+class AND extends Instruction {
     constructor({ opCode, addressMode }) {
         super({
             opCode, addressMode,
@@ -497,10 +497,10 @@ class BRK extends Instruction {
     constructor() {
         super({
             opCode: 0x00,
-            addressMode: null,
+            addressMode: AddressModes.implied,
             mnemonic: 'BRK',
             description: 'Force break',
-            implementation: (cpu) => {
+            implementation: cpu => {
                 cpu.interrupt();
             }
         });
@@ -509,10 +509,62 @@ class BRK extends Instruction {
 
 class BVC extends Instruction { }
 class BVS extends Instruction { }
-class CLC extends Instruction { }
-class CLD extends Instruction { }
-class CLI extends Instruction { }
-class CLV extends Instruction { }
+
+class CLC extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x18,
+            addressMode: AddressModes.implied,
+            mnemonic: 'CLC',
+            description: 'Clear the carry flag',
+            implementation: cpu => {
+                cpu.C = false;
+            }
+        });
+    }
+}
+
+class CLD extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xD8,
+            addressMode: AddressModes.implied,
+            mnemonic: 'CLD',
+            description: 'Clear the decimal flag',
+            implementation: cpu => {
+                cpu.D = false;
+            }
+        });
+    }
+}
+
+class CLI extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x58,
+            addressMode: AddressModes.implied,
+            mnemonic: 'CLI',
+            description: 'Clear the interrupt disabled flag',
+            implementation: cpu => {
+                cpu.I = false;
+            }
+        });
+    }
+}
+
+class CLV extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xB8,
+            addressMode: AddressModes.implied,
+            mnemonic: 'CLV',
+            description: 'Clear the overflow flag',
+            implementation: cpu => {
+                cpu.V = false;
+            }
+        });
+    }
+}
 
 class CMP extends Instruction {
     constructor({ opCode, addressMode }) {
@@ -566,7 +618,7 @@ class DEC extends Instruction { }
 class DEX extends Instruction { }
 class DEY extends Instruction { }
 
-class EOR extends Instruction { 
+class EOR extends Instruction {
     constructor({ opCode, addressMode }) {
         super({
             opCode, addressMode,
@@ -689,9 +741,47 @@ class SBC extends Instruction {
     }
 }
 
-class SEC extends Instruction { }
-class SED extends Instruction { }
-class SEI extends Instruction { }
+class SEC extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x38,
+            addressMode: AddressModes.implied,
+            mnemonic: 'SEC',
+            description: 'Sets the carry flag',
+            implementation: cpu => {
+                cpu.C = true;
+            }
+        });
+    }
+}
+
+class SED extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xF8,
+            addressMode: AddressModes.implied,
+            mnemonic: 'SED',
+            description: 'Sets the decimal flag',
+            implementation: cpu => {
+                cpu.D = true;
+            }
+        });
+    }
+}
+
+class SEI extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x78,
+            addressMode: AddressModes.implied,
+            mnemonic: 'SEI',
+            description: 'Sets the interrupt disable flag',
+            implementation: cpu => {
+                cpu.I = true;
+            }
+        });
+    }
+}
 
 class STA extends Instruction {
     constructor({ opCode, addressMode }) {
@@ -755,7 +845,7 @@ export class InstructionSet {
 }
 
 const mcs6502InstructionSet = new InstructionSet(
-    new BRK({ opCode: 0x00, addressMode: AddressModes.implied }),
+    new BRK(),
     new ORA({ opCode: 0x01, addressMode: AddressModes.Xind }),
     new ORA({ opCode: 0x05, addressMode: AddressModes.zpg }),
     new ASL({ opCode: 0x06, addressMode: AddressModes.zpg }),
@@ -768,7 +858,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new ORA({ opCode: 0x11, addressMode: AddressModes.indY }),
     new ORA({ opCode: 0x15, addressMode: AddressModes.zpgX }),
     new ASL({ opCode: 0x16, addressMode: AddressModes.zpgX }),
-    new CLC({ opCode: 0x18, addressMode: AddressModes.implied }),
+    new CLC(),
     new ORA({ opCode: 0x19, addressMode: AddressModes.absY }),
     new ORA({ opCode: 0x1D, addressMode: AddressModes.absX }),
     new ASL({ opCode: 0x1E, addressMode: AddressModes.absX }),
@@ -787,7 +877,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new AND({ opCode: 0x31, addressMode: AddressModes.indY }),
     new AND({ opCode: 0x35, addressMode: AddressModes.zpgX }),
     new ROL({ opCode: 0x36, addressMode: AddressModes.zpgX }),
-    new SEC({ opCode: 0x38, addressMode: AddressModes.implied }),
+    new SEC(),
     new AND({ opCode: 0x39, addressMode: AddressModes.absY }),
     new AND({ opCode: 0x3D, addressMode: AddressModes.absX }),
     new ROL({ opCode: 0x3E, addressMode: AddressModes.absX }),
@@ -805,7 +895,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new EOR({ opCode: 0x51, addressMode: AddressModes.indY }),
     new EOR({ opCode: 0x55, addressMode: AddressModes.zpgX }),
     new LSR({ opCode: 0x56, addressMode: AddressModes.zpgX }),
-    new CLI({ opCode: 0x58, addressMode: AddressModes.implied }),
+    new CLI(),
     new EOR({ opCode: 0x59, addressMode: AddressModes.absY }),
     new EOR({ opCode: 0x5D, addressMode: AddressModes.absX }),
     new LSR({ opCode: 0x5E, addressMode: AddressModes.absX }),
@@ -823,7 +913,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new ADC({ opCode: 0x71, addressMode: AddressModes.indY }),
     new ADC({ opCode: 0x75, addressMode: AddressModes.zpgX }),
     new ROR({ opCode: 0x76, addressMode: AddressModes.zpgX }),
-    new SEI({ opCode: 0x78, addressMode: AddressModes.implied }),
+    new SEI(),
     new ADC({ opCode: 0x79, addressMode: AddressModes.absY }),
     new ADC({ opCode: 0x7D, addressMode: AddressModes.absX }),
     new ROR({ opCode: 0x7E, addressMode: AddressModes.absX }),
@@ -862,9 +952,9 @@ const mcs6502InstructionSet = new InstructionSet(
     new LDY({ opCode: 0xB4, addressMode: AddressModes.zpgX }),
     new LDA({ opCode: 0xB5, addressMode: AddressModes.zpgX }),
     new LDX({ opCode: 0xB6, addressMode: AddressModes.zpgY }),
-    new CLV({ opCode: 0xB8, addressMode: AddressModes.impl }),
+    new CLV(),
     new LDA({ opCode: 0xB9, addressMode: AddressModes.absY }),
-    new TSX({ opCode: 0xBA, addressMode: AddressModes.impl }),
+    new TSX({ opCode: 0xBA, addressMode: AddressModes.implied }),
     new LDY({ opCode: 0xBC, addressMode: AddressModes.absX }),
     new LDA({ opCode: 0xBD, addressMode: AddressModes.absX }),
     new LDX({ opCode: 0xBE, addressMode: AddressModes.absY }),
@@ -883,7 +973,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new CMP({ opCode: 0xD1, addressMode: AddressModes.indY }),
     new CMP({ opCode: 0xD5, addressMode: AddressModes.zpgX }),
     new DEC({ opCode: 0xD6, addressMode: AddressModes.zpgX }),
-    new CLD({ opCode: 0xD8, addressMode: AddressModes.implied }),
+    new CLD(),
     new CMP({ opCode: 0xD9, addressMode: AddressModes.absY }),
     new CMP({ opCode: 0xDD, addressMode: AddressModes.absX }),
     new DEC({ opCode: 0xDE, addressMode: AddressModes.absX }),
@@ -892,7 +982,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new CPX({ opCode: 0xE4, addressMode: AddressModes.zpg }),
     new SBC({ opCode: 0xE5, addressMode: AddressModes.zpg }),
     new INC({ opCode: 0xE6, addressMode: AddressModes.zpg }),
-    new INX({ opCode: 0xE8, addressMode: AddressModes.impl }),
+    new INX({ opCode: 0xE8, addressMode: AddressModes.implied }),
     new SBC({ opCode: 0xE9, addressMode: AddressModes.immediate }),
     new NOP({ opCode: 0xEA, addressMode: AddressModes.implied }),
     new CPX({ opCode: 0xEC, addressMode: AddressModes.abs }),
@@ -902,7 +992,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new SBC({ opCode: 0xF1, addressMode: AddressModes.indY }),
     new SBC({ opCode: 0xF5, addressMode: AddressModes.zpgX }),
     new INC({ opCode: 0xF6, addressMode: AddressModes.zpgX }),
-    new SED({ opCode: 0xF8, addressMode: AddressModes.impl }),
+    new SED(),
     new SBC({ opCode: 0xF9, addressMode: AddressModes.absY }),
     new SBC({ opCode: 0xFD, addressMode: AddressModes.absX }),
     new INC({ opCode: 0xFE, addressMode: AddressModes.absX })
@@ -1221,13 +1311,13 @@ export default class MCS6502 {
     step() {
         const opCode = this.peek(this.PC);
         const instruction = this[instructionSetSymbol].get(opCode);
-        const bytes = instruction.addressMode.bytes;
+        const bytes = instruction.addressMode ? instruction.addressMode.bytes : 0;
         const operand = bytes == 0 ? null
             : bytes == 1 ? this.peek(this.PC + 1)
                 : this.addressAt(this.PC + 1);
         // console.log(`Executing ${instruction.mnemonic} with operand ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
         instruction.implementation(this, operand);
-        this.PC += 1 + instruction.addressMode.bytes;
+        this.PC += 1 + bytes;
     }
 
     /**

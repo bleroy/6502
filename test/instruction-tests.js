@@ -902,4 +902,81 @@ describe("instructions", () => {
             cpu.N.should.be.true;
         });
     });
+
+    describe("CLC", () => {
+        it("clears the carry flag", () => {
+            const cpu = new MCS6502({ C: true });
+
+            cpu.poke(0x200, 0x18); // CLC
+            cpu.step();
+
+            cpu.C.should.be.false;
+        });
+    });
+
+    describe("SEC", () => {
+        it("sets the carry flag", () => {
+            const cpu = new MCS6502({ C: false });
+
+            cpu.poke(0x200, 0x38); // SEC
+            cpu.step();
+
+            cpu.C.should.be.true;
+        });
+    });
+
+    describe("CLD", () => {
+        it("clears the decimal flag", () => {
+            const cpu = new MCS6502({ D: true });
+
+            cpu.poke(0x200, 0xD8); // CLD
+            cpu.step();
+
+            cpu.D.should.be.false;
+        });
+    });
+
+    describe("SED", () => {
+        it("sets the decimal flag", () => {
+            const cpu = new MCS6502({ D: false });
+
+            cpu.poke(0x200, 0xF8); // SED
+            cpu.step();
+
+            cpu.D.should.be.true;
+        });
+    });
+
+    describe("CLI", () => {
+        it("clears the interrupt disabled flag", () => {
+            const cpu = new MCS6502({ I: true });
+
+            cpu.poke(0x200, 0x58); // CLI
+            cpu.step();
+
+            cpu.I.should.be.false;
+        });
+    });
+
+    describe("SEI", () => {
+        it("sets the carry flag", () => {
+            const cpu = new MCS6502({ I: false });
+
+            cpu.poke(0x200, 0x78); // SEI
+            cpu.step();
+
+            cpu.I.should.be.true;
+        });
+    });
+
+    describe("CLV", () => {
+        it("clears the overflow flag", () => {
+            const cpu = new MCS6502({ V: true });
+
+            cpu.poke(0x200, 0xB8); // CLD
+            cpu.step();
+
+            cpu.V.should.be.false;
+        });
+    });
 });
