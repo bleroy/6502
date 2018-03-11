@@ -64,6 +64,13 @@ export class Address extends Number {
         this[valueSymbol] = value;
     }
 
+    get MSB() { return (this[valueSymbol] >>> 8) & 0xFF; }
+    get LSB() { return this[valueSymbol] & 0xFF; }
+
+    static fromBytes(msb, lsb) {
+        return new Address(msb << 8 | lsb);
+    }
+
     /**
      * The Number value of the address.
      */
@@ -139,9 +146,9 @@ export class Ram {
      * read from 0-page memory, with wraparound behavior beyond address 0xFF.
      */
     addressAt(address, zeroPage = false) {
-        return new Address(
-            this[memorySymbol][address] |
-            (this[memorySymbol][(address + 1) & (zeroPage ? 0xFF : 0xFFFF)] << 8)
+        return Address.fromBytes(
+            this[memorySymbol][(address + 1) & (zeroPage ? 0xFF : 0xFFFF)],
+            this[memorySymbol][address]
         );
     }
 
@@ -753,7 +760,7 @@ class NOP extends Instruction {
             addressMode: AddressModes.implied,
             mnemonic: 'NOP',
             description: 'No operation',
-            implementation: () => {}
+            implementation: () => { }
         })
     }
 }
@@ -833,8 +840,39 @@ class PLP extends Instruction {
 
 class ROL extends Instruction { }
 class ROR extends Instruction { }
-class RTI extends Instruction { }
-class RTS extends Instruction { }
+
+class RTI extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x40,
+            addressMode: AddressModes.implied,
+            mnemonic: 'RTI',
+            description: 'Return from interrupt',
+            implementation: cpu => {
+                cpu.SR = cpu.pull();
+                const lsb = cpu.pull();
+                const msb = cpu.pull();
+                cpu.PC = Address.fromBytes(msb, lsb);
+            }
+        })
+    }
+}
+
+class RTS extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x60,
+            addressMode: AddressModes.implied,
+            mnemonic: 'RTS',
+            description: 'Return from subroutine',
+            implementation: cpu => {
+                const lsb = cpu.pull();
+                const msb = cpu.pull();
+                cpu.PC = Address.fromBytes(msb, lsb);
+            }
+        })
+    }
+}
 
 class SBC extends Instruction {
     constructor({ opCode, addressMode }) {
@@ -1091,7 +1129,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new AND({ opCode: 0x39, addressMode: AddressModes.absY }),
     new AND({ opCode: 0x3D, addressMode: AddressModes.absX }),
     new ROL({ opCode: 0x3E, addressMode: AddressModes.absX }),
-    new RTI({ opCode: 0x40, addressMode: AddressModes.implied }),
+    new RTI(),
     new EOR({ opCode: 0x41, addressMode: AddressModes.Xind }),
     new EOR({ opCode: 0x45, addressMode: AddressModes.zpg }),
     new LSR({ opCode: 0x46, addressMode: AddressModes.zpg }),
@@ -1109,7 +1147,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new EOR({ opCode: 0x59, addressMode: AddressModes.absY }),
     new EOR({ opCode: 0x5D, addressMode: AddressModes.absX }),
     new LSR({ opCode: 0x5E, addressMode: AddressModes.absX }),
-    new RTS({ opCode: 0x60, addressMode: AddressModes.implied }),
+    new RTS(),
     new ADC({ opCode: 0x61, addressMode: AddressModes.Xind }),
     new ADC({ opCode: 0x65, addressMode: AddressModes.zpg }),
     new ROR({ opCode: 0x66, addressMode: AddressModes.zpg }),
@@ -1541,8 +1579,9 @@ export default class MCS6502 {
      */
     interrupt() {
         this.PC++;
-        this.push((this.PC >>> 8) & 0xFF);
-        this.push(this.PC & 0xFF);
+        const pc = new Address(this.PC);
+        this.push(pc.MSB);
+        this.push(pc.LSB);
         this.B = true;
         this.push(this.SR);
         this.I = true;
@@ -1553,6 +1592,7 @@ export default class MCS6502 {
         return this.addressAt(0xFFFE);
     }
     set interruptVector(value) {
-        this.poke(0xFFFE, value & 0xFF, (value >>> 8) & 0xFF);
+        const address = new Address(value);
+        this.poke(0xFFFE, address.LSB, address.MSB);
     }
 }

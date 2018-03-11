@@ -20,6 +20,22 @@ describe('Address', () => {
         });
     });
 
+    describe('MSB and LSB', () => {
+        it("gives back the most and least significant bytes of the address", () => {
+            const address = new Address(0xABCD);
+            address.MSB.should.equal(0xAB);
+            address.LSB.should.equal(0xCD);
+        });
+    });
+
+    describe("fromBytes", () => {
+        it("builds an address from its least and most significant bytes", () => {
+            const address = Address.fromBytes(0xAB, 0xCD);
+            (address instanceof Address).should.be.true;
+            address.should.equal(0xABCD);
+        });
+    });
+
     describe('toString', () => {
         it('formats as a 6502 notation address', () => {
             [
