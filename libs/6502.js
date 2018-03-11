@@ -685,7 +685,19 @@ class LDY extends Instruction {
 }
 
 class LSR extends Instruction { }
-class NOP extends Instruction { }
+
+class NOP extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xEA,
+            addressMode: AddressModes.implied,
+            mnemonic: 'NOP',
+            description: 'No operation',
+            implementation: () => {}
+        })
+    }
+}
+
 class ORA extends Instruction {
     constructor({ opCode, addressMode }) {
         super({
@@ -1067,7 +1079,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new INC({ opCode: 0xE6, addressMode: AddressModes.zpg }),
     new INX({ opCode: 0xE8, addressMode: AddressModes.implied }),
     new SBC({ opCode: 0xE9, addressMode: AddressModes.immediate }),
-    new NOP({ opCode: 0xEA, addressMode: AddressModes.implied }),
+    new NOP(),
     new CPX({ opCode: 0xEC, addressMode: AddressModes.abs }),
     new SBC({ opCode: 0xED, addressMode: AddressModes.abs }),
     new INC({ opCode: 0xEE, addressMode: AddressModes.abs }),
