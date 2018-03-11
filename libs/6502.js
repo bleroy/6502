@@ -772,10 +772,65 @@ class ORA extends Instruction {
         })
     }
 }
-class PHA extends Instruction { }
-class PHP extends Instruction { }
-class PLA extends Instruction { }
-class PLP extends Instruction { }
+
+class PHA extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x48,
+            addressMode: AddressModes.implied,
+            mnemonic: 'PHA',
+            description: 'Push the accumulator onto the stack',
+            implementation: cpu => {
+                cpu.push(cpu.A);
+            }
+        })
+    }
+}
+
+class PHP extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x08,
+            addressMode: AddressModes.implied,
+            mnemonic: 'PHP',
+            description: 'Push processor status onto the stack',
+            implementation: cpu => {
+                // Break flag is always set on the stack value
+                cpu.push(cpu.SR | 0x10);
+            }
+        })
+    }
+}
+
+class PLA extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x68,
+            addressMode: AddressModes.implied,
+            mnemonic: 'PLA',
+            description: 'Pull the accumulator from the stack',
+            implementation: cpu => {
+                cpu.A = cpu.pull();
+                cpu.setFlags(cpu.A);
+            }
+        })
+    }
+}
+
+class PLP extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x28,
+            addressMode: AddressModes.implied,
+            mnemonic: 'PLP',
+            description: 'Pull the processor status from the stack',
+            implementation: cpu => {
+                cpu.SR = cpu.pull();
+            }
+        })
+    }
+}
+
 class ROL extends Instruction { }
 class ROR extends Instruction { }
 class RTI extends Instruction { }
@@ -1004,7 +1059,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new ORA({ opCode: 0x01, addressMode: AddressModes.Xind }),
     new ORA({ opCode: 0x05, addressMode: AddressModes.zpg }),
     new ASL({ opCode: 0x06, addressMode: AddressModes.zpg }),
-    new PHP({ opCode: 0x08, addressMode: AddressModes.implied }),
+    new PHP(),
     new ORA({ opCode: 0x09, addressMode: AddressModes.immediate }),
     new ASL({ opCode: 0x0A, addressMode: AddressModes.A }),
     new ORA({ opCode: 0x0D, addressMode: AddressModes.abs }),
@@ -1022,7 +1077,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new BIT({ opCode: 0x24, addressMode: AddressModes.zeroPage }),
     new AND({ opCode: 0x25, addressMode: AddressModes.zeroPage }),
     new ROL({ opCode: 0x26, addressMode: AddressModes.zeroPage }),
-    new PLP({ opCode: 0x28, addressMode: AddressModes.implied }),
+    new PLP(),
     new AND({ opCode: 0x29, addressMode: AddressModes.immediate }),
     new ROL({ opCode: 0x2A, addressMode: AddressModes.A }),
     new BIT({ opCode: 0x2C, addressMode: AddressModes.abs }),
@@ -1040,7 +1095,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new EOR({ opCode: 0x41, addressMode: AddressModes.Xind }),
     new EOR({ opCode: 0x45, addressMode: AddressModes.zpg }),
     new LSR({ opCode: 0x46, addressMode: AddressModes.zpg }),
-    new PHA({ opCode: 0x48, addressMode: AddressModes.implied }),
+    new PHA(),
     new EOR({ opCode: 0x49, addressMode: AddressModes.immediate }),
     new LSR({ opCode: 0x4A, addressMode: AddressModes.A }),
     new JMP({ opCode: 0x4C, addressMode: AddressModes.abs }),
@@ -1058,7 +1113,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new ADC({ opCode: 0x61, addressMode: AddressModes.Xind }),
     new ADC({ opCode: 0x65, addressMode: AddressModes.zpg }),
     new ROR({ opCode: 0x66, addressMode: AddressModes.zpg }),
-    new PLA({ opCode: 0x68, addressMode: AddressModes.implied }),
+    new PLA(),
     new ADC({ opCode: 0x69, addressMode: AddressModes.immediate }),
     new ROR({ opCode: 0x6A, addressMode: AddressModes.A }),
     new JMP({ opCode: 0x6C, addressMode: AddressModes.indirect }),

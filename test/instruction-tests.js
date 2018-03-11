@@ -1305,4 +1305,68 @@ describe("instructions", () => {
             cpu.N.should.be.false;
         });
     });
+
+    describe("PHA", () => {
+        it("pushes the A register onto the stack", () => {
+            const cpu = new MCS6502({ A: 0x3A });
+
+            cpu.poke(0x200, 0x48); // PHA
+
+            cpu.step();
+            cpu.SP.should.equal(0xFE);
+            cpu.stackPeek().should.equal(0x3A);
+        });
+    });
+
+    describe("PHP", () => {
+        it("pushes the processor status onto the stack, with the break flag set", () => {
+            const cpu = new MCS6502();
+            cpu.SR = 0x27;
+
+            cpu.poke(0x200, 0x08); // PHP
+
+            cpu.step();
+            cpu.SP.should.equal(0xFE);
+            cpu.stackPeek().should.equal(0x37);
+            cpu.SR.should.equal(0x27);
+        });
+    });
+
+    describe("PLA", () => {
+        it("pulls the A register from the stack and sets flags", () => {
+            const cpu = new MCS6502();
+            cpu.push(0xFF);
+            cpu.push(0x00);
+            cpu.push(0x32);
+
+            cpu.poke(0x200, 0x68, 0x68, 0x68); // PLA
+
+            cpu.step();
+            cpu.A.should.equal(0x32);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.A.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.A.should.equal(0xFF);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+        });
+    });
+
+    describe("PLP", () => {
+        it("pulls the status register from the stack and sets flags", () => {
+            const cpu = new MCS6502();
+            cpu.push(0x2F);
+
+            cpu.poke(0x200, 0x28); // PLP
+
+            cpu.step();
+            cpu.SR.should.equal(0x2F);
+        });
+    });
 });
