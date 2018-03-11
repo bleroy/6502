@@ -1033,4 +1033,112 @@ describe("instructions", () => {
             cpu.N.should.be.true;
         });
     });
+
+    describe("TSX", () => {
+        it("transfers the stack pointer to the X register and sets flags", () => {
+            const cpu = new MCS6502({ SP: 0x32, X: 0x00 });
+
+            cpu.poke(0x200,
+                0xBA, 0xBA, 0xBA); // TSX
+
+            cpu.step();
+            cpu.SP.should.equal(0x32);
+            cpu.X.should.equal(0x32);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.SP = 0x00;
+            cpu.step();
+            cpu.X.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.SP = 0xFF;
+            cpu.step();
+            cpu.X.should.equal(0xFF);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+        });
+    });
+
+    describe("TXA", () => {
+        it("transfers the X register to the A register and sets flags", () => {
+            const cpu = new MCS6502({ X: 0x32, A: 0x00 });
+
+            cpu.poke(0x200,
+                0x8A, 0x8A, 0x8A); // TXA
+
+            cpu.step();
+            cpu.X.should.equal(0x32);
+            cpu.A.should.equal(0x32);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.X = 0x00;
+            cpu.step();
+            cpu.A.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.X = 0xFF;
+            cpu.step();
+            cpu.A.should.equal(0xFF);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+        });
+    });
+
+    describe("TXS", () => {
+        it("transfers the X register to the stack pointer but doesn't affect flags", () => {
+            const cpu = new MCS6502({ X: 0x32, SP: 0x00 });
+
+            cpu.poke(0x200,
+                0x9A, 0x9A, 0x9A); // TXS
+
+            cpu.step();
+            cpu.X.should.equal(0x32);
+            cpu.SP.should.equal(0x32);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.X = 0x00;
+            cpu.step();
+            cpu.SP.should.equal(0x00);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.X = 0x80;
+            cpu.step();
+            cpu.SP.should.equal(0x80);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+        });
+    });
+
+    describe("TYA", () => {
+        it("transfers the Y register to the A register and sets flags", () => {
+            const cpu = new MCS6502({ Y: 0x32, A: 0x00 });
+
+            cpu.poke(0x200,
+                0x98, 0x98, 0x98); // TYA
+
+            cpu.step();
+            cpu.Y.should.equal(0x32);
+            cpu.A.should.equal(0x32);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.Y = 0x00;
+            cpu.step();
+            cpu.A.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.Y = 0xFF;
+            cpu.step();
+            cpu.A.should.equal(0xFF);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+        });
+    });
 });

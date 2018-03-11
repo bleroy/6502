@@ -829,10 +829,64 @@ class TAY extends Instruction {
     }
 }
 
-class TSX extends Instruction { }
-class TXA extends Instruction { }
-class TXS extends Instruction { }
-class TYA extends Instruction { }
+class TSX extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xBA,
+            addressMode: AddressModes.implied,
+            mnemonic: 'TSX',
+            description: 'Transfer SP to X',
+            implementation: (cpu, operand) => {
+                cpu.X = cpu.SP;
+                cpu.setFlags(cpu.X);
+            }
+        });
+    }
+}
+
+class TXA extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x8A,
+            addressMode: AddressModes.implied,
+            mnemonic: 'TXA',
+            description: 'Transfer X to A',
+            implementation: (cpu, operand) => {
+                cpu.A = cpu.X;
+                cpu.setFlags(cpu.A);
+            }
+        });
+    }
+}
+
+class TXS extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x9A,
+            addressMode: AddressModes.implied,
+            mnemonic: 'TXS',
+            description: 'Transfer X to SP',
+            implementation: (cpu, operand) => {
+                cpu.SP = cpu.X;
+            }
+        });
+    }
+}
+
+class TYA extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x98,
+            addressMode: AddressModes.implied,
+            mnemonic: 'TYA',
+            description: 'Transfer Y to A',
+            implementation: (cpu, operand) => {
+                cpu.A = cpu.Y;
+                cpu.setFlags(cpu.A);
+            }
+        });
+    }
+}
 
 class InvalidInstruction extends Instruction {
     constructor(opCode) {
@@ -951,7 +1005,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new STA({ opCode: 0x85, addressMode: AddressModes.zpg }),
     new STX({ opCode: 0x86, addressMode: AddressModes.zpg }),
     new DEY({ opCode: 0x88, addressMode: AddressModes.implied }),
-    new TXA({ opCode: 0x8A, addressMode: AddressModes.implied }),
+    new TXA(),
     new STY({ opCode: 0x8C, addressMode: AddressModes.abs }),
     new STA({ opCode: 0x8D, addressMode: AddressModes.abs }),
     new STX({ opCode: 0x8E, addressMode: AddressModes.abs }),
@@ -960,9 +1014,9 @@ const mcs6502InstructionSet = new InstructionSet(
     new STY({ opCode: 0x94, addressMode: AddressModes.zpgX }),
     new STA({ opCode: 0x95, addressMode: AddressModes.zpgX }),
     new STX({ opCode: 0x96, addressMode: AddressModes.zpgY }),
-    new TYA({ opCode: 0x98, addressMode: AddressModes.implied }),
+    new TYA(),
     new STA({ opCode: 0x99, addressMode: AddressModes.absY }),
-    new TXS({ opCode: 0x9A, addressMode: AddressModes.impl }),
+    new TXS(),
     new STA({ opCode: 0x9D, addressMode: AddressModes.absX }),
     new LDY({ opCode: 0xA0, addressMode: AddressModes.immediate }),
     new LDA({ opCode: 0xA1, addressMode: AddressModes.Xind }),
@@ -983,7 +1037,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new LDX({ opCode: 0xB6, addressMode: AddressModes.zpgY }),
     new CLV(),
     new LDA({ opCode: 0xB9, addressMode: AddressModes.absY }),
-    new TSX({ opCode: 0xBA, addressMode: AddressModes.implied }),
+    new TSX(),
     new LDY({ opCode: 0xBC, addressMode: AddressModes.absX }),
     new LDA({ opCode: 0xBD, addressMode: AddressModes.absX }),
     new LDX({ opCode: 0xBE, addressMode: AddressModes.absY }),
