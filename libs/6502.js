@@ -365,13 +365,15 @@ export class Instruction {
      * @param {string}  instr.description - a human-readable description of the instruction
      * @param {instructionImplementation} instr.implementation - the implementation of the instruction
      * @param {AddressMode} instr.addressMode - the address mode
+     * @param {bool} instr.setsPC - set to true for instructions that set PC, such as JMP, BRK, etc.
      */
-    constructor({ mnemonic, opCode, description, implementation, addressMode = AddressModes.implied }) {
+    constructor({ mnemonic, opCode, description, implementation, addressMode = AddressModes.implied, setsPC = false }) {
         this.mnemonic = mnemonic;
         this.opCode = opCode;
         this.description = description;
         this.implementation = implementation;
         this.addressMode = addressMode;
+        this.setsPC = setsPC;
     }
 
     /**
@@ -498,6 +500,7 @@ class BRK extends Instruction {
         super({
             opCode: 0x00,
             addressMode: AddressModes.implied,
+            setsPC: true,
             mnemonic: 'BRK',
             description: 'Force break',
             implementation: cpu => {
@@ -1412,7 +1415,7 @@ export default class MCS6502 {
                 : this.addressAt(this.PC + 1);
         // console.log(`Executing ${instruction.mnemonic} with operand ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
         instruction.implementation(this, operand);
-        this.PC += 1 + bytes;
+        if (!instruction.setsPC) this.PC += 1 + bytes;
     }
 
     /**
