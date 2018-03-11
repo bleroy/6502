@@ -618,8 +618,36 @@ class CPY extends Instruction {
 }
 
 class DEC extends Instruction { }
-class DEX extends Instruction { }
-class DEY extends Instruction { }
+
+class DEX extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xCA,
+            addressMode: AddressModes.implied,
+            mnemonic: 'DEX',
+            description: 'Decrement X',
+            implementation: cpu => {
+                cpu.X = (cpu.X - 1) & 0xFF;
+                cpu.setFlags(cpu.X);
+            }
+        });
+    }
+}
+
+class DEY extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x88,
+            addressMode: AddressModes.implied,
+            mnemonic: 'DEY',
+            description: 'Decrement Y',
+            implementation: cpu => {
+                cpu.Y = (cpu.Y - 1) & 0xFF;
+                cpu.setFlags(cpu.Y);
+            }
+        });
+    }
+}
 
 class EOR extends Instruction {
     constructor({ opCode, addressMode }) {
@@ -637,8 +665,37 @@ class EOR extends Instruction {
 }
 
 class INC extends Instruction { }
-class INX extends Instruction { }
-class INY extends Instruction { }
+
+class INX extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xE8,
+            addressMode: AddressModes.implied,
+            mnemonic: 'INX',
+            description: 'Increment X',
+            implementation: cpu => {
+                cpu.X = (cpu.X + 1) & 0xFF;
+                cpu.setFlags(cpu.X);
+            }
+        });
+    }
+}
+
+class INY extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xC8,
+            addressMode: AddressModes.implied,
+            mnemonic: 'INY',
+            description: 'Increment Y',
+            implementation: cpu => {
+                cpu.Y = (cpu.Y + 1) & 0xFF;
+                cpu.setFlags(cpu.Y);
+            }
+        });
+    }
+}
+
 class JMP extends Instruction { }
 class JSR extends Instruction { }
 
@@ -1019,7 +1076,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new STY({ opCode: 0x84, addressMode: AddressModes.zpg }),
     new STA({ opCode: 0x85, addressMode: AddressModes.zpg }),
     new STX({ opCode: 0x86, addressMode: AddressModes.zpg }),
-    new DEY({ opCode: 0x88, addressMode: AddressModes.implied }),
+    new DEY(),
     new TXA(),
     new STY({ opCode: 0x8C, addressMode: AddressModes.abs }),
     new STA({ opCode: 0x8D, addressMode: AddressModes.abs }),
@@ -1061,9 +1118,9 @@ const mcs6502InstructionSet = new InstructionSet(
     new CPY({ opCode: 0xC4, addressMode: AddressModes.zpg }),
     new CMP({ opCode: 0xC5, addressMode: AddressModes.zpg }),
     new DEC({ opCode: 0xC6, addressMode: AddressModes.zpg }),
-    new INY({ opCode: 0xC8, addressMode: AddressModes.implied }),
+    new INY(),
     new CMP({ opCode: 0xC9, addressMode: AddressModes.immediate }),
-    new DEX({ opCode: 0xCA, addressMode: AddressModes.implied }),
+    new DEX(),
     new CPY({ opCode: 0xCC, addressMode: AddressModes.abs }),
     new CMP({ opCode: 0xCD, addressMode: AddressModes.abs }),
     new DEC({ opCode: 0xCE, addressMode: AddressModes.abs }),
@@ -1080,7 +1137,7 @@ const mcs6502InstructionSet = new InstructionSet(
     new CPX({ opCode: 0xE4, addressMode: AddressModes.zpg }),
     new SBC({ opCode: 0xE5, addressMode: AddressModes.zpg }),
     new INC({ opCode: 0xE6, addressMode: AddressModes.zpg }),
-    new INX({ opCode: 0xE8, addressMode: AddressModes.implied }),
+    new INX(),
     new SBC({ opCode: 0xE9, addressMode: AddressModes.immediate }),
     new NOP(),
     new CPX({ opCode: 0xEC, addressMode: AddressModes.abs }),

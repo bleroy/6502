@@ -1154,6 +1154,7 @@ describe("instructions", () => {
             cpu.X.should.equal(0);
             cpu.Y.should.equal(0);
             cpu.SR.should.equal(0x20);
+            cpu.SP.should.equal(0xFF);
         });
     });
 
@@ -1180,6 +1181,126 @@ describe("instructions", () => {
             cpu.V.should.be.true;
             cpu.B.should.be.true;
             cpu.I.should.be.true;
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+        });
+
+        it("ignores the IRQ disable flag", () => {
+            const cpu = new MCS6502({ C: true, V: true, I: true });
+
+            cpu.poke(0xFFFE, 0x34, 0x12); // -> $1234
+
+            cpu.poke(0x204, 0x00); // BRK
+            cpu.PC = 0x204;
+
+            cpu.step();
+
+            // We were at PC = 0x204. PC + 1 should be on the stack
+            cpu.peek(0x1FF).should.equal(0x02);
+            cpu.peek(0x1FE).should.equal(0x05);
+            // Processor status, with B set, should be on the stack
+            cpu.peek(0x1FD).should.equal(0x75);
+            // The processor should be at $1234
+            cpu.PC.should.equal(0x1234);
+            cpu.SP.should.equal(0xFC);
+            cpu.C.should.be.true;
+            cpu.V.should.be.true;
+            cpu.B.should.be.true;
+            cpu.I.should.be.true;
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+        });
+    });
+
+    describe("DEX", () => {
+        it("decrements the X register and properly sets flags", () => {
+            const cpu = new MCS6502({ X: 0x02 });
+
+            cpu.poke(0x200, 0xCA, 0xCA, 0xCA); // DEX
+
+            cpu.step();
+            cpu.X.should.equal(0x01);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.X.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.X.should.equal(0xFF);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+        });
+    });
+
+    describe("DEY", () => {
+        it("decrements the Y register and properly sets flags", () => {
+            const cpu = new MCS6502({ Y: 0x02 });
+
+            cpu.poke(0x200, 0x88, 0x88, 0x88); // DEY
+
+            cpu.step();
+            cpu.Y.should.equal(0x01);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.Y.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.Y.should.equal(0xFF);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+        });
+    });
+
+    describe("INX", () => {
+        it("increments the X register and properly sets flags", () => {
+            const cpu = new MCS6502({ X: 0x7F });
+
+            cpu.poke(0x200, 0xE8, 0xE8, 0xE8); // INX
+
+            cpu.step();
+            cpu.X.should.equal(0x80);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+
+            cpu.X = 0xFF;
+            cpu.step();
+            cpu.X.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.X.should.equal(0x01);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.false;
+        });
+    });
+
+    describe("INY", () => {
+        it("increments the Y register and properly sets flags", () => {
+            const cpu = new MCS6502({ Y: 0x7F });
+
+            cpu.poke(0x200, 0xC8, 0xC8, 0xC8); // INY
+
+            cpu.step();
+            cpu.Y.should.equal(0x80);
+            cpu.Z.should.be.false;
+            cpu.N.should.be.true;
+
+            cpu.Y = 0xFF;
+            cpu.step();
+            cpu.Y.should.equal(0x00);
+            cpu.Z.should.be.true;
+            cpu.N.should.be.false;
+
+            cpu.step();
+            cpu.Y.should.equal(0x01);
             cpu.Z.should.be.false;
             cpu.N.should.be.false;
         });
