@@ -20,30 +20,6 @@ describe('Instruction', () => {
         });
     });
 
-    describe('execute', () => {
-        it('calls into the instruction\'s implementation', () => {
-            let implementationCalled = false;
-            let processorName = null;
-            let operandValue = null;
-
-            const instruction = new Instruction({
-                implementation: (proc, operand) => {
-                    implementationCalled = true;
-                    processorName = proc.name;
-                    operandValue = operand;
-                    return 2;
-                }
-            });
-
-            const cycles = instruction.execute(new MCS6502(), 42);
-
-            implementationCalled.should.be.true;
-            processorName.should.equal('6502');
-            operandValue.should.equal(42);
-            cycles.should.equal(2);
-        });
-    });
-
     describe('disassemble', () => {
         it("disassembles instructions to source code", () => {
             const instruction = new Instruction({

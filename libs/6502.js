@@ -367,7 +367,8 @@ export const AddressModes = {
  * An instruction implementation callback.
  * @callback instructionImplementation
  * @param {MCS6502} cpu - the processor to use to evaluate the address mode.
- * @param {(Number|Address)=} operand - the operand to evaluate.
+ * @param {Number} operand - the operand after evaluation by the address mode (a byte).
+ * @param {(Number|Address)=} unevaluatedOperand - when relevant, the unevaluated operand.
  * @returns {Number} - the number of cycles used by the instruction.
  */
 
@@ -392,16 +393,6 @@ export class Instruction {
         this.implementation = implementation;
         this.addressMode = addressMode;
         this.setsPC = setsPC;
-    }
-
-    /**
-     * Executes the instruction on a processor
-     * @param {MCS6502} cpu - the processor on which to execute the instruction
-     * @param {(Number|Address)=} operand - the argument to the instruction
-     * @returns {Number} - the number of cycles spent executing the instruction
-     */
-    execute(cpu, operand) {
-        return this.implementation(cpu, operand);
     }
 
     /**
@@ -1571,11 +1562,12 @@ export default class MCS6502 {
         const opCode = this.peek(this.PC);
         const instruction = this[instructionSetSymbol].get(opCode);
         const bytes = instruction.addressMode ? instruction.addressMode.bytes : 0;
-        const operand = bytes == 0 ? null
+        const unevaluatedOperand = bytes == 0 ? null
             : bytes == 1 ? this.peek(this.PC + 1)
                 : this.addressAt(this.PC + 1);
+        const operand = instruction.addressMode.evaluate(this, unevaluatedOperand);
         // console.log(`Executing ${instruction.mnemonic} with operand ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
-        instruction.implementation(this, operand);
+        instruction.implementation(this, operand, unevaluatedOperand);
         if (!instruction.setsPC) this.PC += 1 + bytes;
     }
 
