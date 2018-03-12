@@ -6,7 +6,8 @@ const aSymbol = Symbol('a'), xSymbol = Symbol('x'), ySymbol = Symbol('y'),
     memorySymbol = Symbol('memory'), aHandlersSymbol = Symbol('aHandlers'),
     xHandlersSymbol = Symbol('xHandlers'), yHandlersSymbol = Symbol('yHandlers'),
     breakpointsSymbol = Symbol('breakpoints'), valueSymbol = Symbol('value'),
-    instructionSetSymbol = Symbol('instructionSet');
+    instructionSetSymbol = Symbol('instructionSet'),
+    evaluateInternalSymbol = Symbol('evaluateInternal');
 
 /**
  * Constructs a delegate, which is a list of functions that can be executed as one.
@@ -182,14 +183,6 @@ export class Ram {
  */
 
 /**
- * An address mode evaluation callback that always returns an Address.
- * @callback addressModeAddressEvaluation
- * @param {MCS6502} processor - the processor to use to evaluate the address mode.
- * @param {(Number|Address)=} operand - the operand to evaluate.
- * @returns {Address} - the Address result of the evaluation.
- */
-
-/**
  * An address mode callback that writes data back.
  * @callback addressModeWriter
  * @param {MCS6502} processor - the processor to use to evaluate the address mode.
@@ -221,9 +214,6 @@ export class AddressMode {
      * indirect addressing, both this and `evaluateAddress` must be defined. If this function returns an address,
      * the actual evaluate method on the address mode object will retrieve the value from that address in the processor's
      * memory.
-     * @param {addressModeAddressEvaluation} mode.evaluateAddress - a function that evaluates the operand as an address for this
-     * address mode. Whereas the evaluate method can retrieve a byte from memory, this must always return an Address,
-     * or be undefined if it's meaningless for this address mode.
      * @param {addressModeWriter} - a function that writes a byte back to the target of the address mode.
      * This parameter is optional, and has a default implementation that evaluates the operand as an address and pokes
      * that memory location with the value.
@@ -234,8 +224,7 @@ export class AddressMode {
     constructor({ name, description, evaluate, evaluateAddress, write, disassemble, bytes }) {
         this.name = name;
         this.description = description;
-        this.evaluateInternal = evaluate;
-        this.evaluateAddressInternal = evaluateAddress;
+        this[evaluateInternalSymbol] = evaluate;
         this.disassemble = disassemble;
         this.bytes = bytes;
         this.write = write || ((cpu, operand, value) => {
@@ -251,7 +240,7 @@ export class AddressMode {
      * @returns {Number} - the evaluated result.
      */
     evaluate(cpu, operand) {
-        const evaluation = this.evaluateInternal(cpu, operand);
+        const evaluation = this[evaluateInternalSymbol](cpu, operand);
         return evaluation instanceof Address ? cpu.peek(evaluation) : evaluation;
     }
 
@@ -263,7 +252,7 @@ export class AddressMode {
      * @returns {Address} - the evaluated address.
      */
     evaluateAddress(cpu, operand) {
-        const evaluation = this.evaluateInternal(cpu, operand);
+        const evaluation = this[evaluateInternalSymbol](cpu, operand);
         if (!(evaluation instanceof Address)) throw new TypeError('Result of address mode evaluation is not an address');
         return evaluation;
     }
