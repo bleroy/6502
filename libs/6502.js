@@ -190,6 +190,14 @@ export class Ram {
  */
 
 /**
+ * An address mode callback that writes data back.
+ * @callback addressModeWriter
+ * @param {MCS6502} processor - the processor to use to evaluate the address mode.
+ * @param {(Number|Address)=} operand - the operand to evaluate.
+ * @param {Number} - the byte to write.
+ */
+
+/**
  * A function that generates the string form of an address mode for use by the disassembler.
  * @callback addressModeDisassembler
  * @param {(Number|Address)=} operand - the operand to format.
@@ -216,16 +224,23 @@ export class AddressMode {
      * @param {addressModeAddressEvaluation} mode.evaluateAddress - a function that evaluates the operand as an address for this
      * address mode. Whereas the evaluate method can retrieve a byte from memory, this must always return an Address,
      * or be undefined if it's meaningless for this address mode.
+     * @param {addressModeWriter} - a function that writes a byte back to the target of the address mode.
+     * This parameter is optional, and has a default implementation that evaluates the operand as an address and pokes
+     * that memory location with the value.
      * @param {addressModeDisassembler} mode.disassemble - a function that generates a string representation of the operand
      * for this address mode, to be used by the disassembler.
+     * @param {Number} mode.bytes - the number of bytes in the operand (0, 1, or 2).
      */
-    constructor({ name, description, evaluate, evaluateAddress, disassemble, bytes }) {
+    constructor({ name, description, evaluate, evaluateAddress, write, disassemble, bytes }) {
         this.name = name;
         this.description = description;
         this.evaluateInternal = evaluate;
         this.evaluateAddressInternal = evaluateAddress;
         this.disassemble = disassemble;
         this.bytes = bytes;
+        this.write = write || ((cpu, operand, value) => {
+            cpu.poke(this.evaluateAddress(cpu, operand), value);
+        });
     }
 
     /**
@@ -262,6 +277,7 @@ export const AddressModes = {
         name: 'A',
         description: 'Accumulator',
         evaluate: cpu => cpu.A,
+        write: (cpu, _, value) => { cpu.A = value; },
         disassemble: () => 'A',
         bytes: 0
     }),
@@ -290,6 +306,7 @@ export const AddressModes = {
         name: '#',
         description: 'immediate',
         evaluate: (cpu, operand) => operand,
+        write: () => { throw new Error("Immediate mode cannot write."); },
         disassemble: operand => `#${Byte.toString(operand)}`,
         bytes: 1
     }),
@@ -297,6 +314,7 @@ export const AddressModes = {
         name: 'impl',
         description: 'implied',
         evaluate: () => null,
+        write: () => { throw new Error("Implied mode cannot write."); },
         disassemble: () => '',
         bytes: 0
     }),
@@ -304,6 +322,9 @@ export const AddressModes = {
         name: 'ind',
         description: 'indirect',
         evaluate: (cpu, address) => new Address(cpu.addressAt(address)),
+        write: (cpu, address, value) => {
+            cpu.poke(cpu.addressAt(address), value);
+        },
         disassemble: address => `(${new Address(address).toString()})`,
         bytes: 2
     }),
@@ -325,6 +346,7 @@ export const AddressModes = {
         name: 'rel',
         description: 'relative',
         evaluate: (cpu, offset) => new Address(cpu.PC + offset),
+        write: () => { throw new Error("Relative mode cannot write."); },
         disassemble: offset => `${Byte.toString(offset)}`,
         bytes: 1
     }),
