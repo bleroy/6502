@@ -494,8 +494,23 @@ class AND extends Instruction {
     }
 }
 
+class ASL extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'ASL',
+            description: 'Arithmetic shift left',
+            implementation: (cpu, operand, unevaluatedOperand) => {
+                cpu.C = (operand & 0x80) != 0;
+                const shifted = (operand << 1) & 0xFF;
+                this.addressMode.write(cpu, unevaluatedOperand, shifted);
+                cpu.setFlags(shifted);
+            }
+        })
+    }
+}
+
 // Here be dragons...
-class ASL extends Instruction { }
 class BCC extends Instruction { }
 class BCS extends Instruction { }
 class BEQ extends Instruction { }
