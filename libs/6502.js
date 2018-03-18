@@ -459,11 +459,10 @@ class ADC extends Instruction {
             description: 'Add with carry',
             implementation: (cpu, operand) => {
                 const oldA = cpu.A;
-                const val = addressMode.evaluate(cpu, operand);
-                let sum = oldA + val + (cpu.C ? 1 : 0);
+                let sum = oldA + operand + (cpu.C ? 1 : 0);
                 // console.log(`ADC: A=${oldA}, sum=${sum}`);
                 if (cpu.D) {
-                    if (((oldA & 0xF) + (val & 0xF) + (cpu.C ? 1 : 0)) > 9) {
+                    if (((oldA & 0xF) + (operand & 0xF) + (cpu.C ? 1 : 0)) > 9) {
                         sum += 6;
                     }
                     if (sum > 0x99) sum += 0x60;
@@ -473,7 +472,7 @@ class ADC extends Instruction {
                 }
                 else {
                     cpu.N = (sum & 0x80) != 0;
-                    cpu.V = !((oldA ^ val) & 0x80) && ((oldA ^ sum) & 0x80);
+                    cpu.V = !((oldA ^ operand) & 0x80) && ((oldA ^ sum) & 0x80);
                     cpu.C = sum > 0xFF;
                 }
                 sum &= 0xFF;
@@ -491,8 +490,7 @@ class AND extends Instruction {
             mnemonic: 'AND',
             description: 'Bitwise AND with the accumulator',
             implementation: (cpu, operand) => {
-                const value = addressMode.evaluate(cpu, operand);
-                cpu.A &= value;
+                cpu.A &= operand;
                 cpu.setFlags(cpu.A);
             }
         })
@@ -723,9 +721,8 @@ class CMP extends Instruction {
             mnemonic: 'CMP',
             description: 'Compare with the accumulator',
             implementation: (cpu, operand) => {
-                const value = addressMode.evaluate(cpu, operand);
-                const diff = (cpu.A - value) & 0xFF;
-                cpu.C = cpu.A >= value;
+                const diff = (cpu.A - operand) & 0xFF;
+                cpu.C = cpu.A >= operand;
                 cpu.setFlags(diff);
             }
         })
@@ -739,9 +736,8 @@ class CPX extends Instruction {
             mnemonic: 'CPX',
             description: 'Compare with the X register',
             implementation: (cpu, operand) => {
-                const value = addressMode.evaluate(cpu, operand);
-                const diff = (cpu.X - value) & 0xFF;
-                cpu.C = cpu.X >= value;
+                const diff = (cpu.X - operand) & 0xFF;
+                cpu.C = cpu.X >= operand;
                 cpu.setFlags(diff);
             }
         })
@@ -755,15 +751,15 @@ class CPY extends Instruction {
             mnemonic: 'CPY',
             description: 'Compare with the Y register',
             implementation: (cpu, operand) => {
-                const value = addressMode.evaluate(cpu, operand);
-                const diff = (cpu.Y - value) & 0xFF;
-                cpu.C = cpu.Y >= value;
+                const diff = (cpu.Y - operand) & 0xFF;
+                cpu.C = cpu.Y >= operand;
                 cpu.setFlags(diff);
             }
         })
     }
 }
 
+// Here be dragons...
 class DEC extends Instruction { }
 
 class DEX extends Instruction {
@@ -803,8 +799,7 @@ class EOR extends Instruction {
             mnemonic: 'EOR',
             description: 'Bitwise EOR with the accumulator',
             implementation: (cpu, operand) => {
-                const value = addressMode.evaluate(cpu, operand);
-                cpu.A ^= value;
+                cpu.A ^= operand;
                 cpu.setFlags(cpu.A);
             }
         })
@@ -853,9 +848,8 @@ class LDA extends Instruction {
             mnemonic: 'LDA',
             description: 'Load accumulator',
             implementation: (cpu, operand) => {
-                const value = addressMode.evaluate(cpu, operand);
-                cpu.A = value;
-                cpu.setFlags(value);
+                cpu.A = operand;
+                cpu.setFlags(operand);
             }
         });
     }
@@ -868,9 +862,8 @@ class LDX extends Instruction {
             mnemonic: 'LDX',
             description: 'Load the X registry',
             implementation: (cpu, operand) => {
-                const value = addressMode.evaluate(cpu, operand);
-                cpu.X = value;
-                cpu.setFlags(value);
+                cpu.X = operand;
+                cpu.setFlags(operand);
             }
         });
     }
@@ -883,9 +876,8 @@ class LDY extends Instruction {
             mnemonic: 'LDY',
             description: 'Load the Y registry',
             implementation: (cpu, operand) => {
-                const value = addressMode.evaluate(cpu, operand);
-                cpu.Y = value;
-                cpu.setFlags(value);
+                cpu.Y = operand;
+                cpu.setFlags(operand);
             }
         });
     }
@@ -912,8 +904,7 @@ class ORA extends Instruction {
             mnemonic: 'ORA',
             description: 'Bitwise OR with the accumulator',
             implementation: (cpu, operand) => {
-                const value = addressMode.evaluate(cpu, operand);
-                cpu.A |= value;
+                cpu.A |= operand;
                 cpu.setFlags(cpu.A);
             }
         })
@@ -1022,11 +1013,10 @@ class SBC extends Instruction {
             description: 'Subtract with carry',
             implementation: (cpu, operand) => {
                 const oldA = cpu.A;
-                const val = addressMode.evaluate(cpu, operand);
-                let diff = (oldA - val - (cpu.C ? 0 : 1)) & 0xFFF;
+                let diff = (oldA - operand - (cpu.C ? 0 : 1)) & 0xFFF;
                 // console.log(`SBC: A=${oldA}, sum=${sum}`);
                 if (cpu.D) {
-                    if (((oldA & 0xF) - (cpu.C ? 0 : 1)) < (val & 0x0F)) {
+                    if (((oldA & 0xF) - (cpu.C ? 0 : 1)) < (operand & 0x0F)) {
                         diff -= 6;
                     }
                     if (diff > 0x99) diff -= 0x60;
@@ -1035,7 +1025,7 @@ class SBC extends Instruction {
                 }
                 else {
                     cpu.N = (diff & 0x80) != 0;
-                    cpu.V = ((oldA ^ val) & 0x80) && ((oldA ^ diff) & 0x80);
+                    cpu.V = ((oldA ^ operand) & 0x80) && ((oldA ^ diff) & 0x80);
                 }
                 cpu.C = diff < 0x100;
                 diff &= 0xFF;
