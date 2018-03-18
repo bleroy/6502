@@ -1188,16 +1188,38 @@ class STA extends Instruction {
             opCode, addressMode,
             mnemonic: 'STA',
             description: 'Store accumulator',
-            implementation: (cpu, operand) => {
-                cpu.poke(addressMode.evaluateAddress(cpu, operand), cpu.A);
+            implementation: (cpu, _, unevaluatedOperand) => {
+                this.addressMode.write(cpu, unevaluatedOperand, cpu.A);
             }
         });
     }
 }
 
-// Here be dragons...
-class STX extends Instruction { }
-class STY extends Instruction { }
+class STX extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'STX',
+            description: 'Store X',
+            implementation: (cpu, _, unevaluatedOperand) => {
+                this.addressMode.write(cpu, unevaluatedOperand, cpu.X);
+            }
+        });
+    }
+}
+
+class STY extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'STY',
+            description: 'Store Y',
+            implementation: (cpu, _, unevaluatedOperand) => {
+                this.addressMode.write(cpu, unevaluatedOperand, cpu.Y);
+            }
+        });
+    }
+}
 
 class TAX extends Instruction {
     constructor() {
