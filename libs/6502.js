@@ -252,12 +252,11 @@ export class AddressMode {
      * Instructions that handle addresses, such as JMP, should call into this to evaluate the operand.
      * @param {MCS6502} cpu - the processor in the context of which this operand should be evaluated.
      * @param {(Number|Address)=} operand - the operand to evaluate.
-     * @returns {Address} - the evaluated address.
+     * @returns {Address} - the evaluated address if the address mode can evaluate as an address, null otherwise.
      */
     evaluateAddress(cpu, operand) {
         const evaluation = this[evaluateInternalSymbol](cpu, operand);
-        if (!(evaluation instanceof Address)) throw new TypeError('Result of address mode evaluation is not an address');
-        return evaluation;
+        return (!(evaluation instanceof Address)) ? null : evaluation;
     }
 }
 
@@ -771,8 +770,20 @@ class CPY extends Instruction {
     }
 }
 
-// Here be dragons...
-class DEC extends Instruction { }
+class DEC extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'DEC',
+            description: 'Decrement memory',
+            implementation: (cpu, operand, _, address) => {
+                const val = (operand - 1) & 0xFF;
+                cpu.poke(address, val);
+                cpu.setFlags(val);
+            }
+        });
+    }
+}
 
 class DEX extends Instruction {
     constructor() {
@@ -818,7 +829,20 @@ class EOR extends Instruction {
     }
 }
 
-class INC extends Instruction { }
+class INC extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'INC',
+            description: 'Increment memory',
+            implementation: (cpu, operand, _, address) => {
+                const val = (operand + 1) & 0xFF;
+                cpu.poke(address, val);
+                cpu.setFlags(val);
+            }
+        });
+    }
+}
 
 class INX extends Instruction {
     constructor() {
@@ -850,6 +874,7 @@ class INY extends Instruction {
     }
 }
 
+// Here be dragons...
 class JMP extends Instruction { }
 class JSR extends Instruction { }
 
@@ -1705,9 +1730,10 @@ export default class MCS6502 {
         const unevaluatedOperand = bytes == 0 ? null
             : bytes == 1 ? this.peek(this.PC + 1)
                 : this.addressAt(this.PC + 1);
+        const address = instruction.addressMode.evaluateAddress(this, unevaluatedOperand);
         const operand = instruction.addressMode.evaluate(this, unevaluatedOperand);
         // console.log(`Executing ${instruction.mnemonic} at ${new Address(this.PC).toString()} with operand ${unevaluatedOperand}, evaluated by ${instruction.addressMode.description} mode to ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
-        let instructionResult = instruction.implementation(this, operand, unevaluatedOperand);
+        let instructionResult = instruction.implementation(this, operand, unevaluatedOperand, address);
         if (instructionResult && instructionResult.PC) this.PC = instructionResult.PC;
         else this.PC += 1 + bytes;
     }

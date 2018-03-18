@@ -51,8 +51,7 @@ describe('AddressMode', () => {
                 evaluate: (cpu, operand) => 0
             });
 
-            expect(() => {mode.evaluateAddress(cpu, 42);})
-                .to.throw(TypeError, null, `EvaluateAddress should throw when used with a non-address evaluation.`);
+            expect(mode.evaluateAddress(cpu, 42)).to.be.null;
         });
 
         it('returns the evaluation when it\'s an address', () => {
