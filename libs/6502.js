@@ -209,12 +209,10 @@ export class AddressMode {
      * @param {string} mode.name - the name of the address mode.
      * @param {string} mode.description - the description of the address mode.
      * @param {addressModeEvaluation} mode.evaluate - a function that evaluates an operand for this address mode,
-     * in the context of the provided processor. If there's no ambiguity between evaluating the address or the value,
-     * such as for the absolute address mode, only this evaluation has to be defined. Otherwise, such as is the case for
-     * indirect addressing, both this and `evaluateAddress` must be defined. If this function returns an address,
+     * in the context of the provided processor. If this function returns an address,
      * the actual evaluate method on the address mode object will retrieve the value from that address in the processor's
      * memory.
-     * @param {addressModeWriter} - a function that writes a byte back to the target of the address mode.
+     * @param {addressModeWriter} mode.write - a function that writes a byte back to the target of the address mode.
      * This parameter is optional, and has a default implementation that evaluates the operand as an address and pokes
      * that memory location with the value.
      * @param {addressModeDisassembler} mode.disassemble - a function that generates a string representation of the operand
@@ -223,7 +221,7 @@ export class AddressMode {
      * @param {bool} mode.evaluatesAsAddress - if true, the operand is evaluated as an address, not as the byte it could point to.
      * Relative address mode uses that as it's only used by instructions that consume addresses.
      */
-    constructor({ name, description, evaluate, evaluateAddress, write, disassemble, bytes, evaluatesAsAddress = false }) {
+    constructor({ name, description, evaluate, write, disassemble, bytes, evaluatesAsAddress = false }) {
         this.name = name;
         this.description = description;
         this[evaluateInternalSymbol] = evaluate;
@@ -776,9 +774,9 @@ class DEC extends Instruction {
             opCode, addressMode,
             mnemonic: 'DEC',
             description: 'Decrement memory',
-            implementation: (cpu, operand, _, address) => {
+            implementation: (cpu, operand, unevaluatedOperand) => {
                 const val = (operand - 1) & 0xFF;
-                cpu.poke(address, val);
+                addressMode.write(cpu, unevaluatedOperand, val);
                 cpu.setFlags(val);
             }
         });
@@ -835,9 +833,9 @@ class INC extends Instruction {
             opCode, addressMode,
             mnemonic: 'INC',
             description: 'Increment memory',
-            implementation: (cpu, operand, _, address) => {
+            implementation: (cpu, operand, unevaluatedOperand) => {
                 const val = (operand + 1) & 0xFF;
-                cpu.poke(address, val);
+                addressMode.write(cpu, unevaluatedOperand, val);
                 cpu.setFlags(val);
             }
         });
@@ -1730,10 +1728,9 @@ export default class MCS6502 {
         const unevaluatedOperand = bytes == 0 ? null
             : bytes == 1 ? this.peek(this.PC + 1)
                 : this.addressAt(this.PC + 1);
-        const address = instruction.addressMode.evaluateAddress(this, unevaluatedOperand);
         const operand = instruction.addressMode.evaluate(this, unevaluatedOperand);
         // console.log(`Executing ${instruction.mnemonic} at ${new Address(this.PC).toString()} with operand ${unevaluatedOperand}, evaluated by ${instruction.addressMode.description} mode to ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
-        let instructionResult = instruction.implementation(this, operand, unevaluatedOperand, address);
+        let instructionResult = instruction.implementation(this, operand, unevaluatedOperand);
         if (instructionResult && instructionResult.PC) this.PC = instructionResult.PC;
         else this.PC += 1 + bytes;
     }
