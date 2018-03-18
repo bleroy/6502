@@ -561,8 +561,20 @@ class BEQ extends Instruction {
     }
 }
 
-// Here be dragons...
-class BIT extends Instruction { }
+class BIT extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'BIT',
+            description: 'Test bits with the accumulator',
+            implementation: (cpu, operand) => {
+                cpu.Z = (cpu.A & operand) == 0;
+                cpu.N = (operand & 0x80) != 0;
+                cpu.V = (operand & 0x40) != 0;
+            }
+        })
+    }
+}
 
 class BMI extends Instruction {
     constructor() {
