@@ -872,9 +872,35 @@ class INY extends Instruction {
     }
 }
 
-// Here be dragons...
-class JMP extends Instruction { }
-class JSR extends Instruction { }
+class JMP extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'JMP',
+            description: 'Jump',
+            // Note: this does not implement page boundary bugs of early 6502 processors
+            implementation: (_, operand, unevaluatedOperand) => {
+                return { PC: unevaluatedOperand };
+            }
+        })
+    }
+}
+
+class JSR extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'JSR',
+            description: 'Jump to subroutine',
+            implementation: (cpu, operand, unevaluatedOperand) => {
+                const pc = new Address(cpu.PC);
+                cpu.push(pc.MSB);
+                cpu.push(pc.LSB);
+                return { PC: unevaluatedOperand };
+            }
+        })
+    }
+}
 
 class LDA extends Instruction {
     constructor({ opCode, addressMode }) {
@@ -918,6 +944,7 @@ class LDY extends Instruction {
     }
 }
 
+// Here be dragons...
 class LSR extends Instruction { }
 
 class NOP extends Instruction {
