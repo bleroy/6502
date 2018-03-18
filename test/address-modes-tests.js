@@ -4,6 +4,8 @@ const should = chai.should();
 
 import MCS6502, { AddressMode, AddressModes, Address, Byte } from '../libs/6502';
 
+// TODO: add more negative offset tests for relevant address modes
+
 describe('AddressMode', () => {
     describe('constructor', () => {
         it('properly sets properties', () => {
@@ -303,7 +305,7 @@ describe('AddressModes', () => {
         it('evaluates as the PC plus the argument for a negative offset', () => {
             const cpu = new MCS6502({PC: 0x202});
 
-            const val = AddressModes.rel.evaluateAddress(cpu, -0x50);
+            const val = AddressModes.rel.evaluateAddress(cpu, 0xB0); // -0x50
 
             (val instanceof Address).should.be.true;
             val.should.equal(0x1B2);

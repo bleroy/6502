@@ -12,12 +12,12 @@ describe('Interruptions', () => {
         cpu.poke(0xFFFE, 0x34);
         cpu.poke(0xFFFF, 0x12);
 
-        cpu.interrupt();
+        const { PC } = cpu.interrupt();
 
         cpu.I.should.be.true;
         cpu.B.should.be.true;
         cpu.SR.should.equal(0x34);
-        cpu.PC.should.equal(0x1234);
+        PC.should.equal(0x1234);
         cpu.pull().should.equal(0x30);
         cpu.pull().should.equal(0x01);
         cpu.pull().should.equal(0x02);

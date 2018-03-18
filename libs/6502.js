@@ -220,8 +220,10 @@ export class AddressMode {
      * @param {addressModeDisassembler} mode.disassemble - a function that generates a string representation of the operand
      * for this address mode, to be used by the disassembler.
      * @param {Number} mode.bytes - the number of bytes in the operand (0, 1, or 2).
+     * @param {bool} mode.evaluatesAsAddress - if true, the operand is evaluated as an address, not as the byte it could point to.
+     * Relative address mode uses that as it's only used by instructions that consume addresses.
      */
-    constructor({ name, description, evaluate, evaluateAddress, write, disassemble, bytes }) {
+    constructor({ name, description, evaluate, evaluateAddress, write, disassemble, bytes, evaluatesAsAddress = false }) {
         this.name = name;
         this.description = description;
         this[evaluateInternalSymbol] = evaluate;
@@ -230,6 +232,7 @@ export class AddressMode {
         this.write = write || ((cpu, operand, value) => {
             cpu.poke(this.evaluateAddress(cpu, operand), value);
         });
+        this.evaluatesAsAddress = evaluatesAsAddress;
     }
 
     /**
@@ -237,11 +240,11 @@ export class AddressMode {
      * Instructions that handle Byte data, such as ADC, should call into this to evaluate the operand.
      * @param {MCS6502} cpu - the processor in the context of which this operand should be evaluated. 
      * @param {(Number|Address)=} operand - the operand to evaluate.
-     * @returns {Number} - the evaluated result.
+     * @returns {Number|Address} - the evaluated result.
      */
     evaluate(cpu, operand) {
         const evaluation = this[evaluateInternalSymbol](cpu, operand);
-        return evaluation instanceof Address ? cpu.peek(evaluation) : evaluation;
+        return (evaluation instanceof Address && !this.evaluatesAsAddress) ? cpu.peek(evaluation) : evaluation;
     }
 
     /**
@@ -280,14 +283,14 @@ export const AddressModes = {
     absX: new AddressMode({
         name: 'abs,X',
         description: 'absolute, X-indexed',
-        evaluate: (cpu, address) => new Address(address + cpu.X),
+        evaluate: (cpu, address) => new Address(address + Byte.signedValue(cpu.X)),
         disassemble: address => `${new Address(address).toString()},X`,
         bytes: 2
     }),
     absY: new AddressMode({
         name: 'abs,Y',
         description: 'absolute, Y-indexed',
-        evaluate: (cpu, address) => new Address(address + cpu.Y),
+        evaluate: (cpu, address) => new Address(address + Byte.signedValue(cpu.Y)),
         disassemble: address => `${new Address(address).toString()},Y`,
         bytes: 2
     }),
@@ -320,21 +323,22 @@ export const AddressModes = {
     Xind: new AddressMode({
         name: 'X,ind',
         description: 'X-indexed, indirect',
-        evaluate: (cpu, address) => new Address(cpu.addressAt((address + cpu.X) & 0xFF, true)),
+        evaluate: (cpu, address) => new Address(cpu.addressAt((address + Byte.signedValue(cpu.X)) & 0xFF, true)),
         disassemble: address => `(${Byte.toString(address)},X)`,
         bytes: 1
     }),
     indY: new AddressMode({
         name: 'ind,Y',
         description: 'indirect, Y-indexed',
-        evaluate: (cpu, address) => new Address(cpu.addressAt(address, true) + cpu.Y),
+        evaluate: (cpu, address) => new Address(cpu.addressAt(address, true) + Byte.signedValue(cpu.Y)),
         disassemble: address => `(${Byte.toString(address)}),Y`,
         bytes: 1
     }),
     rel: new AddressMode({
         name: 'rel',
         description: 'relative',
-        evaluate: (cpu, offset) => new Address(cpu.PC + offset),
+        evaluate: (cpu, offset) => new Address(cpu.PC + Byte.signedValue(offset)),
+        evaluatesAsAddress: true,
         write: () => { throw new Error("Relative mode cannot write."); },
         disassemble: offset => `${Byte.toString(offset)}`,
         bytes: 1
@@ -349,14 +353,14 @@ export const AddressModes = {
     zpgX: new AddressMode({
         name: 'zpg,X',
         description: 'zero page, X-indexed',
-        evaluate: (cpu, address) => new Address((address + cpu.X) & 0xFF),
+        evaluate: (cpu, address) => new Address((address + Byte.signedValue(cpu.X)) & 0xFF),
         disassemble: address => `${Byte.toString(address)},X`,
         bytes: 1
     }),
     zpgY: new AddressMode({
         name: 'zpg,Y',
         description: 'zero page, Y-indexed',
-        evaluate: (cpu, address) => new Address((address + cpu.Y) & 0xFF),
+        evaluate: (cpu, address) => new Address((address + Byte.signedValue(cpu.Y)) & 0xFF),
         disassemble: address => `${Byte.toString(address)},Y`,
         bytes: 1
     })
@@ -369,7 +373,10 @@ export const AddressModes = {
  * @param {MCS6502} cpu - the processor to use to evaluate the address mode.
  * @param {Number} operand - the operand after evaluation by the address mode (a byte).
  * @param {(Number|Address)=} unevaluatedOperand - when relevant, the unevaluated operand.
- * @returns {Number} - the number of cycles used by the instruction.
+ * @returns {Object=} - if a result is provided, it can specify a number of cycles, a new PC
+ * address, etc.
+ * cycles: a number of cycles spent by a 6502 to execute this instruction
+ * PC: a new PC address
  */
 
 /**
@@ -384,15 +391,13 @@ export class Instruction {
      * @param {string}  instr.description - a human-readable description of the instruction
      * @param {instructionImplementation} instr.implementation - the implementation of the instruction
      * @param {AddressMode} instr.addressMode - the address mode
-     * @param {bool} instr.setsPC - set to true for instructions that set PC, such as JMP, BRK, etc.
      */
-    constructor({ mnemonic, opCode, description, implementation, addressMode = AddressModes.implied, setsPC = false }) {
+    constructor({ mnemonic, opCode, description, implementation, addressMode = AddressModes.implied }) {
         this.mnemonic = mnemonic;
         this.opCode = opCode;
         this.description = description;
         this.implementation = implementation;
         this.addressMode = addressMode;
-        this.setsPC = setsPC;
     }
 
     /**
@@ -510,32 +515,150 @@ class ASL extends Instruction {
     }
 }
 
+class BCC extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x90,
+            addressMode: AddressModes.rel,
+            mnemonic: 'BCC',
+            description: 'Branch if carry clear',
+            implementation: (cpu, address, c) => {
+                if (!cpu.C) {
+                    return { PC: address + 2 };
+                }
+            }
+        });
+    }
+}
+
+class BCS extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xB0,
+            addressMode: AddressModes.rel,
+            mnemonic: 'BCS',
+            description: 'Branch if carry set',
+            implementation: (cpu, address, c) => {
+                if (cpu.C) {
+                    return { PC: address + 2 };
+                }
+            }
+        });
+    }
+}
+
+class BEQ extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xF0,
+            addressMode: AddressModes.rel,
+            mnemonic: 'BEQ',
+            description: 'Branch if equal to zero',
+            implementation: (cpu, address, c) => {
+                if (cpu.Z) {
+                    return { PC: address + 2 };
+                }
+            }
+        });
+    }
+}
+
 // Here be dragons...
-class BCC extends Instruction { }
-class BCS extends Instruction { }
-class BEQ extends Instruction { }
 class BIT extends Instruction { }
-class BMI extends Instruction { }
-class BNE extends Instruction { }
-class BPL extends Instruction { }
+
+class BMI extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x30,
+            addressMode: AddressModes.rel,
+            mnemonic: 'BMI',
+            description: 'Branch if negative',
+            implementation: (cpu, address, c) => {
+                if (cpu.N) {
+                    return { PC: address + 2 };
+                }
+            }
+        });
+    }
+}
+
+class BNE extends Instruction {
+    constructor() {
+        super({
+            opCode: 0xD0,
+            addressMode: AddressModes.rel,
+            mnemonic: 'BNE',
+            description: 'Branch if not equal to zero',
+            implementation: (cpu, address, c) => {
+                if (!cpu.Z) {
+                    return { PC: address + 2 };
+                }
+            }
+        });
+    }
+}
+
+class BPL extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x10,
+            addressMode: AddressModes.rel,
+            mnemonic: 'BPL',
+            description: 'Branch if positive',
+            implementation: (cpu, address, c) => {
+                if (!cpu.N) {
+                    return { PC: address + 2 };
+                }
+            }
+        });
+    }
+}
 
 class BRK extends Instruction {
     constructor() {
         super({
             opCode: 0x00,
             addressMode: AddressModes.implied,
-            setsPC: true,
             mnemonic: 'BRK',
             description: 'Force break',
             implementation: cpu => {
-                cpu.interrupt();
+                return cpu.interrupt();
             }
         });
     }
 }
 
-class BVC extends Instruction { }
-class BVS extends Instruction { }
+class BVC extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x50,
+            addressMode: AddressModes.rel,
+            mnemonic: 'BVC',
+            description: 'Branch if overflow clear',
+            implementation: (cpu, address, c) => {
+                if (!cpu.V) {
+                    return { PC: address + 2 };
+                }
+            }
+        });
+    }
+}
+
+class BVS extends Instruction {
+    constructor() {
+        super({
+            opCode: 0x70,
+            addressMode: AddressModes.rel,
+            mnemonic: 'BVS',
+            description: 'Branch if overflow set',
+            implementation: (cpu, address, c) => {
+                if (cpu.V) {
+                    return { PC: address + 2 };
+                }
+            }
+        });
+    }
+}
 
 class CLC extends Instruction {
     constructor() {
@@ -1581,9 +1704,10 @@ export default class MCS6502 {
             : bytes == 1 ? this.peek(this.PC + 1)
                 : this.addressAt(this.PC + 1);
         const operand = instruction.addressMode.evaluate(this, unevaluatedOperand);
-        // console.log(`Executing ${instruction.mnemonic} with operand ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
-        instruction.implementation(this, operand, unevaluatedOperand);
-        if (!instruction.setsPC) this.PC += 1 + bytes;
+        // console.log(`Executing ${instruction.mnemonic} at ${new Address(this.PC).toString()} with operand ${unevaluatedOperand}, evaluated by ${instruction.addressMode.description} mode to ${operand}, then skipping ${1 + instruction.addressMode.bytes}`);
+        let instructionResult = instruction.implementation(this, operand, unevaluatedOperand);
+        if (instructionResult && instructionResult.PC) this.PC = instructionResult.PC;
+        else this.PC += 1 + bytes;
     }
 
     /**
@@ -1603,7 +1727,7 @@ export default class MCS6502 {
         this.B = true;
         this.push(this.SR);
         this.I = true;
-        this.PC = this.interruptVector;
+        return { PC: this.interruptVector };
     }
 
     get interruptVector() {
