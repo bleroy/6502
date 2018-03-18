@@ -944,8 +944,21 @@ class LDY extends Instruction {
     }
 }
 
-// Here be dragons...
-class LSR extends Instruction { }
+class LSR extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'LSR',
+            description: 'Logical shift right',
+            implementation: (cpu, operand, unevaluatedOperand) => {
+                cpu.C = (operand & 0x01) != 0;
+                const shifted = operand >>> 1;
+                this.addressMode.write(cpu, unevaluatedOperand, shifted);
+                cpu.setFlags(shifted);
+            }
+        })
+    }
+}
 
 class NOP extends Instruction {
     constructor() {
@@ -1031,8 +1044,37 @@ class PLP extends Instruction {
     }
 }
 
-class ROL extends Instruction { }
-class ROR extends Instruction { }
+class ROL extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'ROL',
+            description: 'Rotate left',
+            implementation: (cpu, operand, unevaluatedOperand) => {
+                const rotated = ((operand << 1) | (cpu.C ? 1 : 0)) & 0xFF;
+                cpu.C = (operand & 0x80) != 0;
+                this.addressMode.write(cpu, unevaluatedOperand, rotated);
+                cpu.setFlags(rotated);
+            }
+        })
+    }
+}
+
+class ROR extends Instruction {
+    constructor({ opCode, addressMode }) {
+        super({
+            opCode, addressMode,
+            mnemonic: 'ROR',
+            description: 'Rotate right',
+            implementation: (cpu, operand, unevaluatedOperand) => {
+                const rotated = ((operand >>> 1) | (cpu.C ? 0x80 : 0)) & 0xFF;
+                cpu.C = (operand & 0x01) != 0;
+                this.addressMode.write(cpu, unevaluatedOperand, rotated);
+                cpu.setFlags(rotated);
+            }
+        })
+    }
+}
 
 class RTI extends Instruction {
     constructor() {
@@ -1153,6 +1195,7 @@ class STA extends Instruction {
     }
 }
 
+// Here be dragons...
 class STX extends Instruction { }
 class STY extends Instruction { }
 

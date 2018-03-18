@@ -17,7 +17,7 @@ describe("ASL", () => {
             0x0E, 0x01, 0x7F, // ASL $7F01
             0x0E, 0x02, 0x35, // ASL $3502
             0x0E, 0x03, 0x35, // ASL $3503
-            0x0E, 0x04, 0x12, // ASL $1204
+            0x0E, 0x04, 0x12  // ASL $1204
         );
 
         cpu.step(); // ASL $7F00
