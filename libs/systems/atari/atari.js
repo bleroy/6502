@@ -56,6 +56,26 @@ export class CanvasScreen extends Screen {
         this.ctx.fillStyle = color.rgb;
         this.ctx.fillRect(this.pixelWidth * this.zoom * x, this.pixelHeight * this.zoom * y, this.pixelWidth * this.zoom, this.pixelHeight * this.zoom);
     }
+
+    drawChar(x, y, char, color) {
+        const img = this.ctx.createImageData(8, 8);
+        for (let l = 0; l < 8; l++) {
+            const charLine = char[l]
+            for (let c = 0; c < 8; c++) {
+                const lit = (charLine & (0x80 >>> c)) != 0;
+                if (lit) {
+                    const idx = 4 * (c + l * 8);
+                    img.data[idx] = color.r;
+                    img.data[idx + 1] = color.g;
+                    img.data[idx + 2] = color.b;
+                    img.data[idx + 3] = 255;
+                }
+            }
+        }
+        const w = this.pixelWidth * this.zoom;
+        const h = this.pixelHeight * this.zoom;
+        this.ctx.putImageData(img, x * w, y * h, 0, 0, 8 * w, 8 * h);
+    }
 }
 
 /**
