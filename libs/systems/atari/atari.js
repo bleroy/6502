@@ -25,11 +25,10 @@ export default class Atari {
  * An abstract virtual screen for the Atari system.
  */
 export class Screen {
-    clearScanLine(backgroundColor) {}
-    paintScanLine() {}
-    displayScreen() {}
-    paint(x, color) {}
-    drawCharLine(x, charLine, color) {}
+    renderPixel(color) {}
+    renderByte(byte, foreground, background) {}
+    horizontalSync() {}
+    verticalSync() {}
 }
 
 /**
@@ -42,11 +41,8 @@ export class CanvasScreen extends Screen {
      * The resolution of the canvas should be at least 320x192, although larger canvases can theoretically
      * display larger screens, up to 384x240.
      * 
-     * A screen constructs an image scan line by scan line, because the Atari had the ability
+     * A screen constructs an image scan line by scan line, then pixel by pixel,because the Atari had the ability
      * to change arbitrary parameters, such as colors, at any time.
-     * 
-     * The most precise timing-based rendering techniques that rely on mid-scanline changes
-     * won't work, but vertical ones, which are the most common, should.
      */
     constructor(canvas, zoom = 1, smoothing = false) {
         super();
@@ -54,72 +50,48 @@ export class CanvasScreen extends Screen {
         this.zoom = zoom;
         
         this.canvas = canvas;
-        this.context = canvas.getContext('2d');
+        this._context = canvas.getContext('2d');
         
         const doc = canvas.ownerDocument;
         
-        const scanLine = this.scanLine = doc.createElement("canvas");
+        const scanLine = this._scanLine = doc.createElement("canvas");
         scanLine.width = 384;
         scanLine.height = 1;
-        this.scanLineContext = scanLine.getContext('2d');
-
-        const buffer = this.buffer = doc.createElement("canvas");
-        buffer.width = canvas.width;
-        buffer.height = canvas.height;
-        this.bufferContext = buffer.getContext('2d');
-
-        const charBuffer = this.charBuffer = doc.createElement("canvas");
-        charBuffer.width = 8;
-        charBuffer.height = 1;
-        this.charContext = charBuffer.getContext('2d');
+        this._scanLineContext = scanLine.getContext('2d');
+        this._lineImageData = this._scanLineContext.createImageData(384, 1);
         
-        this.context.imageSmoothingEnabled = this.bufferContext.imageSmoothingEnabled = smoothing;
-        this._charCache = [];
-        this.scanLineIndex = 0;
+        this._context.imageSmoothingEnabled = this._scanLineContext.imageSmoothingEnabled = smoothing;
+        this.verticalPosition = 0;
+        this.horizontalPosition = 0;
+        this._lineImageIndex = 0;
     }
 
-    paint(x, color) {
-        this.scanLineContext.fillStyle = color.rgb;
-        this.scanLineContext.fillRect(x, 0, 1, 1);
-    }
+    renderPixel(color) {
+        const imgdata = this._lineImageData.data;
+        imgdata[this._lineImageIndex++] = color.r;
+        imgdata[this._lineImageIndex++] = color.g;
+        imgdata[this._lineImageIndex++] = color.b;
+        imgdata[this._lineImageIndex++] = 255;
+}
 
-    drawCharLine(x, charLine, color) {
-        let charCache = this._charCache[charLine];
-        if (!charCache) charCache = this._charCache[charLine] = [];
-        let img = charCache[color.code];
-        if (!img) {
-            img = charCache[color.code] = this.charContext.createImageData(8, 1);
-            const imgdata = img.data;
-            for (let c = 0; c < 8; c++) {
-                const lit = (charLine & (0x80 >>> c)) != 0;
-                if (lit) {
-                    const idx = c << 2;
-                    imgdata[idx] = color.r;
-                    imgdata[idx + 1] = color.g;
-                    imgdata[idx + 2] = color.b;
-                    imgdata[idx + 3] = 255;
-                }
-            }
+    renderByte(byte, foreground, background) {
+        for (let c = 0; c < 8; c++) {
+            const lit = (byte & (0x80 >>> c)) != 0;
+            this.renderPixel(lit ? foreground : background);
         }
-        this.charContext.putImageData(img, 0, 0);
-        this.scanLineContext.drawImage(this.charBuffer, x, 0);
     }
 
-    clearScanLine(backgroundColor) {
-        this.scanLineContext.fillStyle = backgroundColor.rgb;
-        this.scanLineContext.fillRect(0, 0, 384, 1);
-    }
-
-    paintScanLine() {
-        this.bufferContext.drawImage(this.scanLine,
+    horizontalSync() {
+        this._scanLineContext.putImageData(this._lineImageData, 0, 0);
+        this._context.drawImage(this._scanLine,
             0, 0, 384, 1,
-            0, this.scanLineIndex * this.zoom, 384 * this.zoom, this.zoom);
-        this.scanLineIndex++;
+            0, this.verticalPosition * this.zoom, 384 * this.zoom, this.zoom);
+        this._lineImageIndex = this.horizontalPosition = 0;
+        this.verticalPosition++;
     }
 
-    displayScreen() {
-        this.context.drawImage(this.buffer, 0, 0);
-        this.scanLineIndex = 0;
+    verticalSync() {
+        this.verticalPosition = 0;
     }
 }
 
@@ -129,70 +101,70 @@ export class CanvasScreen extends Screen {
  * As such, this is an arbitrary choice, one that I've done my best to be easily replaceable.
  */
 export const palette = [
-    {r: 0, g: 0, b: 0}, {r: 65, g: 32, b: 0}, {r: 69, g: 25, b: 4}, {r: 93, g: 31, b: 12}, 
-    {r: 74, g: 23, b: 0}, {r: 73, g: 0, b: 54}, {r: 72, g: 3, b: 108}, {r: 5, g: 30, b: 129}, 
-    {r: 11, g: 7, b: 121}, {r: 29, g: 41, b: 90}, {r: 0, g: 75, b: 89}, {r: 0, g: 72, b: 0}, 
-    {r: 22, g: 64, b: 0}, {r: 44, g: 53, b: 0}, {r: 70, g: 58, b: 9}, {r: 64, g: 26, b: 2}, 
-    {r: 37, g: 37, b: 37}, {r: 84, g: 40, b: 0}, {r: 114, g: 30, b: 17}, {r: 122, g: 36, b: 13}, 
-    {r: 114, g: 31, b: 0}, {r: 102, g: 0, b: 75}, {r: 92, g: 4, b: 136}, {r: 6, g: 38, b: 165}, 
-    {r: 32, g: 28, b: 142}, {r: 29, g: 56, b: 118}, {r: 0, g: 93, b: 110}, {r: 0, g: 84, b: 0}, 
-    {r: 28, g: 83, b: 0}, {r: 56, g: 68, b: 0}, {r: 77, g: 63, b: 9}, {r: 88, g: 31, b: 5}, 
-    {r: 52, g: 52, b: 52}, {r: 118, g: 55, b: 0}, {r: 159, g: 36, b: 30}, {r: 152, g: 44, b: 14}, 
-    {r: 168, g: 19, b: 0}, {r: 128, g: 3, b: 95}, {r: 101, g: 13, b: 144}, {r: 8, g: 47, b: 202}, 
-    {r: 53, g: 49, b: 163}, {r: 29, g: 72, b: 146}, {r: 0, g: 111, b: 132}, {r: 3, g: 107, b: 3}, 
-    {r: 35, g: 102, b: 0}, {r: 68, g: 82, b: 0}, {r: 84, g: 69, b: 9}, {r: 112, g: 36, b: 8}, 
-    {r: 78, g: 78, b: 78}, {r: 154, g: 80, b: 0}, {r: 179, g: 58, b: 32}, {r: 176, g: 47, b: 15}, 
-    {r: 200, g: 33, b: 10}, {r: 149, g: 15, b: 116}, {r: 123, g: 35, b: 167}, {r: 38, g: 61, b: 212}, 
-    {r: 70, g: 66, b: 180}, {r: 29, g: 92, b: 172}, {r: 0, g: 132, b: 156}, {r: 14, g: 118, b: 14}, 
-    {r: 40, g: 120, b: 0}, {r: 73, g: 86, b: 0}, {r: 108, g: 88, b: 9}, {r: 141, g: 58, b: 19}, 
-    {r: 104, g: 104, b: 104}, {r: 195, g: 104, b: 6}, {r: 200, g: 81, b: 32}, {r: 191, g: 54, b: 36}, 
-    {r: 223, g: 37, b: 18}, {r: 170, g: 34, b: 136}, {r: 147, g: 59, b: 191}, {r: 68, g: 76, b: 222}, 
-    {r: 87, g: 83, b: 197}, {r: 29, g: 113, b: 198}, {r: 0, g: 153, b: 191}, {r: 24, g: 128, b: 24}, 
-    {r: 46, g: 140, b: 0}, {r: 96, g: 113, b: 0}, {r: 144, g: 118, b: 9}, {r: 171, g: 81, b: 31}, 
-    {r: 117, g: 117, b: 117}, {r: 228, g: 123, b: 7}, {r: 227, g: 105, b: 32}, {r: 211, g: 78, b: 42}, 
-    {r: 236, g: 59, b: 36}, {r: 186, g: 61, b: 153}, {r: 157, g: 69, b: 201}, {r: 79, g: 90, b: 236}, 
-    {r: 97, g: 93, b: 207}, {r: 50, g: 134, b: 207}, {r: 0, g: 171, b: 202}, {r: 39, g: 146, b: 39}, 
-    {r: 58, g: 152, b: 12}, {r: 108, g: 127, b: 0}, {r: 171, g: 139, b: 10}, {r: 181, g: 100, b: 39}, 
-    {r: 142, g: 142, b: 142}, {r: 255, g: 145, b: 26}, {r: 252, g: 129, b: 32}, {r: 231, g: 98, b: 62}, 
-    {r: 250, g: 82, b: 54}, {r: 202, g: 77, b: 169}, {r: 167, g: 79, b: 211}, {r: 90, g: 104, b: 255}, 
-    {r: 109, g: 105, b: 219}, {r: 72, g: 155, b: 217}, {r: 0, g: 188, b: 222}, {r: 54, g: 164, b: 54}, 
-    {r: 71, g: 165, b: 25}, {r: 121, g: 141, b: 10}, {r: 193, g: 161, b: 32}, {r: 191, g: 119, b: 48}, 
-    {r: 164, g: 164, b: 164}, {r: 255, g: 171, b: 29}, {r: 253, g: 140, b: 37}, {r: 243, g: 110, b: 74}, 
-    {r: 252, g: 97, b: 72}, {r: 215, g: 90, b: 182}, {r: 178, g: 90, b: 222}, {r: 101, g: 117, b: 255}, 
-    {r: 123, g: 119, b: 233}, {r: 78, g: 168, b: 236}, {r: 0, g: 208, b: 245}, {r: 78, g: 185, b: 78}, 
-    {r: 81, g: 175, b: 35}, {r: 139, g: 159, b: 28}, {r: 208, g: 176, b: 47}, {r: 208, g: 133, b: 58}, 
-    {r: 184, g: 184, b: 184}, {r: 255, g: 197, b: 31}, {r: 254, g: 152, b: 44}, {r: 253, g: 120, b: 84}, 
-    {r: 255, g: 112, b: 95}, {r: 228, g: 103, b: 195}, {r: 189, g: 101, b: 233}, {r: 113, g: 131, b: 255}, 
-    {r: 137, g: 133, b: 247}, {r: 85, g: 182, b: 255}, {r: 16, g: 220, b: 255}, {r: 81, g: 205, b: 81}, 
-    {r: 92, g: 186, b: 46}, {r: 158, g: 178, b: 47}, {r: 222, g: 190, b: 61}, {r: 225, g: 147, b: 68}, 
-    {r: 197, g: 197, b: 197}, {r: 255, g: 208, b: 59}, {r: 255, g: 174, b: 56}, {r: 255, g: 138, b: 106}, 
-    {r: 255, g: 126, b: 126}, {r: 239, g: 114, b: 206}, {r: 197, g: 109, b: 241}, {r: 128, g: 145, b: 255}, 
-    {r: 145, g: 141, b: 255}, {r: 105, g: 202, b: 255}, {r: 62, g: 225, b: 255}, {r: 114, g: 218, b: 114}, 
-    {r: 113, g: 207, b: 67}, {r: 171, g: 191, b: 60}, {r: 230, g: 198, b: 69}, {r: 237, g: 160, b: 78}, 
-    {r: 208, g: 208, b: 208}, {r: 255, g: 216, b: 76}, {r: 255, g: 185, b: 70}, {r: 255, g: 152, b: 124}, 
-    {r: 255, g: 143, b: 143}, {r: 251, g: 126, b: 218}, {r: 206, g: 118, b: 250}, {r: 144, g: 160, b: 255}, 
-    {r: 156, g: 152, b: 255}, {r: 116, g: 203, b: 255}, {r: 100, g: 231, b: 255}, {r: 124, g: 228, b: 124}, 
-    {r: 133, g: 227, b: 87}, {r: 184, g: 204, b: 73}, {r: 237, g: 205, b: 76}, {r: 249, g: 173, b: 88}, 
-    {r: 215, g: 215, b: 215}, {r: 255, g: 230, b: 81}, {r: 255, g: 191, b: 81}, {r: 255, g: 164, b: 139}, 
-    {r: 255, g: 157, b: 158}, {r: 255, g: 141, b: 225}, {r: 213, g: 131, b: 255}, {r: 151, g: 169, b: 255}, 
-    {r: 167, g: 164, b: 255}, {r: 130, g: 211, b: 255}, {r: 118, g: 234, b: 255}, {r: 133, g: 237, b: 133}, 
-    {r: 141, g: 235, b: 95}, {r: 194, g: 214, b: 83}, {r: 245, g: 216, b: 98}, {r: 252, g: 183, b: 92}, 
-    {r: 225, g: 225, b: 225}, {r: 255, g: 244, b: 86}, {r: 255, g: 198, b: 109}, {r: 255, g: 179, b: 158}, 
-    {r: 255, g: 171, b: 173}, {r: 255, g: 157, b: 229}, {r: 218, g: 144, b: 255}, {r: 159, g: 178, b: 255}, 
-    {r: 178, g: 175, b: 255}, {r: 141, g: 218, b: 255}, {r: 139, g: 237, b: 255}, {r: 153, g: 242, b: 153}, 
-    {r: 151, g: 245, b: 105}, {r: 205, g: 225, b: 83}, {r: 251, g: 226, b: 118}, {r: 255, g: 193, b: 96}, 
-    {r: 234, g: 234, b: 234}, {r: 255, g: 249, b: 112}, {r: 255, g: 213, b: 135}, {r: 255, g: 194, b: 178}, 
-    {r: 255, g: 185, b: 189}, {r: 255, g: 165, b: 231}, {r: 222, g: 156, b: 255}, {r: 175, g: 190, b: 255}, 
-    {r: 187, g: 184, b: 255}, {r: 159, g: 212, b: 255}, {r: 154, g: 239, b: 255}, {r: 179, g: 247, b: 179}, 
-    {r: 160, g: 254, b: 114}, {r: 219, g: 239, b: 108}, {r: 252, g: 238, b: 152}, {r: 255, g: 202, b: 105}, 
-    {r: 244, g: 244, b: 244}, {r: 255, g: 255, b: 144}, {r: 255, g: 228, b: 152}, {r: 255, g: 208, b: 195}, 
-    {r: 255, g: 199, b: 206}, {r: 255, g: 175, b: 234}, {r: 226, g: 169, b: 255}, {r: 192, g: 203, b: 255}, 
-    {r: 195, g: 193, b: 255}, {r: 180, g: 226, b: 255}, {r: 177, g: 243, b: 255}, {r: 195, g: 249, b: 195}, 
-    {r: 177, g: 255, b: 138}, {r: 232, g: 252, b: 121}, {r: 253, g: 243, b: 169}, {r: 255, g: 207, b: 126}, 
-    {r: 255, g: 255, b: 255}, {r: 255, g: 255, b: 170}, {r: 255, g: 230, b: 171}, {r: 255, g: 218, b: 208}, 
-    {r: 255, g: 202, b: 222}, {r: 255, g: 184, b: 236}, {r: 230, g: 182, b: 255}, {r: 205, g: 211, b: 255}, 
-    {r: 211, g: 209, b: 255}, {r: 192, g: 235, b: 255}, {r: 199, g: 246, b: 255}, {r: 205, g: 252, b: 205}, 
-    {r: 188, g: 255, b: 154}, {r: 242, g: 255, b: 171}, {r: 253, g: 243, b: 190}, {r: 255, g: 218, b: 150}
+    {r: 0, g: 0, b: 0}, {r: 37, g: 37, b: 37}, {r: 52, g: 52, b: 52}, {r: 78, g: 78, b: 78},
+    {r: 104, g: 104, b: 104}, {r: 117, g: 117, b: 117}, {r: 142, g: 142, b: 142}, {r: 164, g: 164, b: 164},
+    {r: 184, g: 184, b: 184}, {r: 197, g: 197, b: 197}, {r: 208, g: 208, b: 208}, {r: 215, g: 215, b: 215},
+    {r: 225, g: 225, b: 225}, {r: 234, g: 234, b: 234}, {r: 244, g: 244, b: 244}, {r: 255, g: 255, b: 255},
+    {r: 65, g: 32, b: 0}, {r: 84, g: 40, b: 0}, {r: 118, g: 55, b: 0}, {r: 154, g: 80, b: 0},
+    {r: 195, g: 104, b: 6}, {r: 228, g: 123, b: 7}, {r: 255, g: 145, b: 26}, {r: 255, g: 171, b: 29},
+    {r: 255, g: 197, b: 31}, {r: 255, g: 208, b: 59}, {r: 255, g: 216, b: 76}, {r: 255, g: 230, b: 81},
+    {r: 255, g: 244, b: 86}, {r: 255, g: 249, b: 112}, {r: 255, g: 255, b: 144}, {r: 255, g: 255, b: 170},
+    {r: 69, g: 25, b: 4}, {r: 114, g: 30, b: 17}, {r: 159, g: 36, b: 30}, {r: 179, g: 58, b: 32},
+    {r: 200, g: 81, b: 32}, {r: 227, g: 105, b: 32}, {r: 252, g: 129, b: 32}, {r: 253, g: 140, b: 37},
+    {r: 254, g: 152, b: 44}, {r: 255, g: 174, b: 56}, {r: 255, g: 185, b: 70}, {r: 255, g: 191, b: 81},
+    {r: 255, g: 198, b: 109}, {r: 255, g: 213, b: 135}, {r: 255, g: 228, b: 152}, {r: 255, g: 230, b: 171},
+    {r: 93, g: 31, b: 12}, {r: 122, g: 36, b: 13}, {r: 152, g: 44, b: 14}, {r: 176, g: 47, b: 15},
+    {r: 191, g: 54, b: 36}, {r: 211, g: 78, b: 42}, {r: 231, g: 98, b: 62}, {r: 243, g: 110, b: 74},
+    {r: 253, g: 120, b: 84}, {r: 255, g: 138, b: 106}, {r: 255, g: 152, b: 124}, {r: 255, g: 164, b: 139},
+    {r: 255, g: 179, b: 158}, {r: 255, g: 194, b: 178}, {r: 255, g: 208, b: 195}, {r: 255, g: 218, b: 208},
+    {r: 74, g: 23, b: 0}, {r: 114, g: 31, b: 0}, {r: 168, g: 19, b: 0}, {r: 200, g: 33, b: 10},
+    {r: 223, g: 37, b: 18}, {r: 236, g: 59, b: 36}, {r: 250, g: 82, b: 54}, {r: 252, g: 97, b: 72},
+    {r: 255, g: 112, b: 95}, {r: 255, g: 126, b: 126}, {r: 255, g: 143, b: 143}, {r: 255, g: 157, b: 158},
+    {r: 255, g: 171, b: 173}, {r: 255, g: 185, b: 189}, {r: 255, g: 199, b: 206}, {r: 255, g: 202, b: 222},
+    {r: 73, g: 0, b: 54}, {r: 102, g: 0, b: 75}, {r: 128, g: 3, b: 95}, {r: 149, g: 15, b: 116},
+    {r: 170, g: 34, b: 136}, {r: 186, g: 61, b: 153}, {r: 202, g: 77, b: 169}, {r: 215, g: 90, b: 182},
+    {r: 228, g: 103, b: 195}, {r: 239, g: 114, b: 206}, {r: 251, g: 126, b: 218}, {r: 255, g: 141, b: 225},
+    {r: 255, g: 157, b: 229}, {r: 255, g: 165, b: 231}, {r: 255, g: 175, b: 234}, {r: 255, g: 184, b: 236},
+    {r: 72, g: 3, b: 108}, {r: 92, g: 4, b: 136}, {r: 101, g: 13, b: 144}, {r: 123, g: 35, b: 167},
+    {r: 147, g: 59, b: 191}, {r: 157, g: 69, b: 201}, {r: 167, g: 79, b: 211}, {r: 178, g: 90, b: 222},
+    {r: 189, g: 101, b: 233}, {r: 197, g: 109, b: 241}, {r: 206, g: 118, b: 250}, {r: 213, g: 131, b: 255},
+    {r: 218, g: 144, b: 255}, {r: 222, g: 156, b: 255}, {r: 226, g: 169, b: 255}, {r: 230, g: 182, b: 255},
+    {r: 5, g: 30, b: 129}, {r: 6, g: 38, b: 165}, {r: 8, g: 47, b: 202}, {r: 38, g: 61, b: 212},
+    {r: 68, g: 76, b: 222}, {r: 79, g: 90, b: 236}, {r: 90, g: 104, b: 255}, {r: 101, g: 117, b: 255},
+    {r: 113, g: 131, b: 255}, {r: 128, g: 145, b: 255}, {r: 144, g: 160, b: 255}, {r: 151, g: 169, b: 255},
+    {r: 159, g: 178, b: 255}, {r: 175, g: 190, b: 255}, {r: 192, g: 203, b: 255}, {r: 205, g: 211, b: 255},
+    {r: 11, g: 7, b: 121}, {r: 32, g: 28, b: 142}, {r: 53, g: 49, b: 163}, {r: 70, g: 66, b: 180},
+    {r: 87, g: 83, b: 197}, {r: 97, g: 93, b: 207}, {r: 109, g: 105, b: 219}, {r: 123, g: 119, b: 233},
+    {r: 137, g: 133, b: 247}, {r: 145, g: 141, b: 255}, {r: 156, g: 152, b: 255}, {r: 167, g: 164, b: 255},
+    {r: 178, g: 175, b: 255}, {r: 187, g: 184, b: 255}, {r: 195, g: 193, b: 255}, {r: 211, g: 209, b: 255},
+    {r: 29, g: 41, b: 90}, {r: 29, g: 56, b: 118}, {r: 29, g: 72, b: 146}, {r: 29, g: 92, b: 172},
+    {r: 29, g: 113, b: 198}, {r: 50, g: 134, b: 207}, {r: 72, g: 155, b: 217}, {r: 78, g: 168, b: 236},
+    {r: 85, g: 182, b: 255}, {r: 105, g: 202, b: 255}, {r: 116, g: 203, b: 255}, {r: 130, g: 211, b: 255},
+    {r: 141, g: 218, b: 255}, {r: 159, g: 212, b: 255}, {r: 180, g: 226, b: 255}, {r: 192, g: 235, b: 255},
+    {r: 0, g: 75, b: 89}, {r: 0, g: 93, b: 110}, {r: 0, g: 111, b: 132}, {r: 0, g: 132, b: 156},
+    {r: 0, g: 153, b: 191}, {r: 0, g: 171, b: 202}, {r: 0, g: 188, b: 222}, {r: 0, g: 208, b: 245},
+    {r: 16, g: 220, b: 255}, {r: 62, g: 225, b: 255}, {r: 100, g: 231, b: 255}, {r: 118, g: 234, b: 255},
+    {r: 139, g: 237, b: 255}, {r: 154, g: 239, b: 255}, {r: 177, g: 243, b: 255}, {r: 199, g: 246, b: 255},
+    {r: 0, g: 72, b: 0}, {r: 0, g: 84, b: 0}, {r: 3, g: 107, b: 3}, {r: 14, g: 118, b: 14},
+    {r: 24, g: 128, b: 24}, {r: 39, g: 146, b: 39}, {r: 54, g: 164, b: 54}, {r: 78, g: 185, b: 78},
+    {r: 81, g: 205, b: 81}, {r: 114, g: 218, b: 114}, {r: 124, g: 228, b: 124}, {r: 133, g: 237, b: 133},
+    {r: 153, g: 242, b: 153}, {r: 179, g: 247, b: 179}, {r: 195, g: 249, b: 195}, {r: 205, g: 252, b: 205},
+    {r: 22, g: 64, b: 0}, {r: 28, g: 83, b: 0}, {r: 35, g: 102, b: 0}, {r: 40, g: 120, b: 0},
+    {r: 46, g: 140, b: 0}, {r: 58, g: 152, b: 12}, {r: 71, g: 165, b: 25}, {r: 81, g: 175, b: 35},
+    {r: 92, g: 186, b: 46}, {r: 113, g: 207, b: 67}, {r: 133, g: 227, b: 87}, {r: 141, g: 235, b: 95},
+    {r: 151, g: 245, b: 105}, {r: 160, g: 254, b: 114}, {r: 177, g: 255, b: 138}, {r: 188, g: 255, b: 154},
+    {r: 44, g: 53, b: 0}, {r: 56, g: 68, b: 0}, {r: 68, g: 82, b: 0}, {r: 73, g: 86, b: 0},
+    {r: 96, g: 113, b: 0}, {r: 108, g: 127, b: 0}, {r: 121, g: 141, b: 10}, {r: 139, g: 159, b: 28},
+    {r: 158, g: 178, b: 47}, {r: 171, g: 191, b: 60}, {r: 184, g: 204, b: 73}, {r: 194, g: 214, b: 83},
+    {r: 205, g: 225, b: 83}, {r: 219, g: 239, b: 108}, {r: 232, g: 252, b: 121}, {r: 242, g: 255, b: 171},
+    {r: 70, g: 58, b: 9}, {r: 77, g: 63, b: 9}, {r: 84, g: 69, b: 9}, {r: 108, g: 88, b: 9},
+    {r: 144, g: 118, b: 9}, {r: 171, g: 139, b: 10}, {r: 193, g: 161, b: 32}, {r: 208, g: 176, b: 47},
+    {r: 222, g: 190, b: 61}, {r: 230, g: 198, b: 69}, {r: 237, g: 205, b: 76}, {r: 245, g: 216, b: 98},
+    {r: 251, g: 226, b: 118}, {r: 252, g: 238, b: 152}, {r: 253, g: 243, b: 169}, {r: 253, g: 243, b: 190},
+    {r: 64, g: 26, b: 2}, {r: 88, g: 31, b: 5}, {r: 112, g: 36, b: 8}, {r: 141, g: 58, b: 19},
+    {r: 171, g: 81, b: 31}, {r: 181, g: 100, b: 39}, {r: 191, g: 119, b: 48}, {r: 208, g: 133, b: 58},
+    {r: 225, g: 147, b: 68}, {r: 237, g: 160, b: 78}, {r: 249, g: 173, b: 88}, {r: 252, g: 183, b: 92},
+    {r: 255, g: 193, b: 96}, {r: 255, g: 202, b: 105}, {r: 255, g: 207, b: 126}, {r: 255, g: 218, b: 150}
 ];
 
 export class Color {
