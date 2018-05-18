@@ -1,4 +1,6 @@
-import MCS6502 from '../../6502';
+import MCS6502, {Address} from '../../6502';
+
+// TODO: symbols & some immutability
 
 /**
  * An Atari 8-bit emulator that emulates standard OS calls in JavaScript, without requiring ROMs
@@ -12,13 +14,10 @@ export default class Atari {
         this.cpu = new MCS6502();
         this.screen = screen;
 
-        this.colors = new Array(palette.length);
-        for (let i = 0; i < palette.length; i++) {
-            const tint = palette[i];
-            this.colors[i] = new Color((i & 0xF0) >>> 4, i & 0xF, tint.r, tint.g, tint.b);
-        }
+        this.colors = new Array(256);
+        for (let c = 0; c < 256; c++) {this.colors[c] = new Color(c, palette)}
         
-        this.antic = new Antic(screen);
+        this.antic = new Antic(screen, this.cpu);
     }
 }
 
@@ -26,7 +25,11 @@ export default class Atari {
  * An abstract virtual screen for the Atari system.
  */
 export class Screen {
-    paint(x, y, color) {}
+    clearScanLine(backgroundColor) {}
+    paintScanLine() {}
+    displayScreen() {}
+    paint(x, color) {}
+    drawCharLine(x, charLine, color) {}
 }
 
 /**
@@ -36,45 +39,87 @@ export class CanvasScreen extends Screen {
     /**
      * Creates a screen using the provided canvas.
      * @param {HTMLCanvasElement} canvas - a canvas element for the screen to use as its surface.
-     * The resolution of the canvas should be at least 320x192, although taller canvases can theoretically
-     * display larger screens.
+     * The resolution of the canvas should be at least 320x192, although larger canvases can theoretically
+     * display larger screens, up to 384x240.
+     * 
+     * A screen constructs an image scan line by scan line, because the Atari had the ability
+     * to change arbitrary parameters, such as colors, at any time.
+     * 
+     * The most precise timing-based rendering techniques that rely on mid-scanline changes
+     * won't work, but vertical ones, which are the most common, should.
      */
-    constructor(canvas, pixelWidth = 1, pixelHeight = 1, zoom = 1) {
+    constructor(canvas, zoom = 1, smoothing = false) {
         super();
+        
         this.zoom = zoom;
-        this.pixelWidth = pixelWidth;
-        this.pixelHeight = pixelHeight;
+        
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
-        if (canvas) {
-            this.physicalWidth = canvas.width;
-            this.physicalHeight = canvas.height;
-        }
+        this.context = canvas.getContext('2d');
+        
+        const doc = canvas.ownerDocument;
+        
+        const scanLine = this.scanLine = doc.createElement("canvas");
+        scanLine.width = 384;
+        scanLine.height = 1;
+        this.scanLineContext = scanLine.getContext('2d');
+
+        const buffer = this.buffer = doc.createElement("canvas");
+        buffer.width = canvas.width;
+        buffer.height = canvas.height;
+        this.bufferContext = buffer.getContext('2d');
+
+        const charBuffer = this.charBuffer = doc.createElement("canvas");
+        charBuffer.width = 8;
+        charBuffer.height = 1;
+        this.charContext = charBuffer.getContext('2d');
+        
+        this.context.imageSmoothingEnabled = this.bufferContext.imageSmoothingEnabled = smoothing;
+        this._charCache = [];
+        this.scanLineIndex = 0;
     }
 
-    paint(x, y, color) {
-        this.ctx.fillStyle = color.rgb;
-        this.ctx.fillRect(this.pixelWidth * this.zoom * x, this.pixelHeight * this.zoom * y, this.pixelWidth * this.zoom, this.pixelHeight * this.zoom);
+    paint(x, color) {
+        this.scanLineContext.fillStyle = color.rgb;
+        this.scanLineContext.fillRect(x, 0, 1, 1);
     }
 
-    drawChar(x, y, char, color) {
-        const img = this.ctx.createImageData(8, 8);
-        for (let l = 0; l < 8; l++) {
-            const charLine = char[l]
+    drawCharLine(x, charLine, color) {
+        let charCache = this._charCache[charLine];
+        if (!charCache) charCache = this._charCache[charLine] = [];
+        let img = charCache[color.code];
+        if (!img) {
+            img = charCache[color.code] = this.charContext.createImageData(8, 1);
+            const imgdata = img.data;
             for (let c = 0; c < 8; c++) {
                 const lit = (charLine & (0x80 >>> c)) != 0;
                 if (lit) {
-                    const idx = 4 * (c + l * 8);
-                    img.data[idx] = color.r;
-                    img.data[idx + 1] = color.g;
-                    img.data[idx + 2] = color.b;
-                    img.data[idx + 3] = 255;
+                    const idx = c << 2;
+                    imgdata[idx] = color.r;
+                    imgdata[idx + 1] = color.g;
+                    imgdata[idx + 2] = color.b;
+                    imgdata[idx + 3] = 255;
                 }
             }
         }
-        const w = this.pixelWidth * this.zoom;
-        const h = this.pixelHeight * this.zoom;
-        this.ctx.putImageData(img, x * w, y * h, 0, 0, 8 * w, 8 * h);
+        this.charContext.putImageData(img, 0, 0);
+        this.scanLineContext.drawImage(this.charBuffer, x, 0);
+    }
+
+    clearScanLine(backgroundColor) {
+        this.scanLineContext.fillStyle = backgroundColor.rgb;
+        this.scanLineContext.fillRect(0, 0, 384, 1);
+    }
+
+    paintScanLine() {
+        this.bufferContext.drawImage(this.scanLine,
+            0, 0, 384, 1,
+            0, this.scanLineIndex * this.zoom, 384 * this.zoom, this.zoom);
+        this.scanLineIndex++;
+    }
+
+    displayScreen() {
+        this.context.drawImage(this.buffer, 0, 0);
+        this.scanLineIndex = 0;
     }
 }
 
@@ -151,13 +196,15 @@ export const palette = [
 ];
 
 export class Color {
-    constructor(hue, luminance, r, g, b) {
-        this.hue = hue;
-        this.luminance = luminance;
-        this.r = r;
-        this.g = g;
-        this.b = b;
-        this.rgb = `rgb(${r}, ${g}, ${b})`;
+    constructor(code, palette) {
+        this.code = code;
+        this.hue = (code & 0xF0) >>> 4;
+        this.luminance = code & 0x0F;
+        const c = palette[code];
+        this.r = c.r;
+        this.g = c.g;
+        this.b = c.b;
+        this.rgb = `rgb(${c.r}, ${c.g}, ${c.b})`;
     }
 }
 
@@ -165,30 +212,62 @@ export class Color {
  * Antic graphic modes enumeration
  */
 export const graphicModes = [
-    /* 00 */ {antic: 0x02, colors:  2, isText: true,  horizontalResolution:  40, scanLinesPerLine:  8},
-    /* 01 */ {antic: 0x06, colors:  5, isText: true,  horizontalResolution:  20, scanLinesPerLine:  8},
-    /* 02 */ {antic: 0x07, colors:  5, isText: true,  horizontalResolution:  20, scanLinesPerLine: 16},
-    /* 03 */ {antic: 0x08, colors:  4, isText: false, horizontalResolution:  40, scanLinesPerLine:  8},
-    /* 04 */ {antic: 0x09, colors:  2, isText: false, horizontalResolution:  80, scanLinesPerLine:  4},
-    /* 05 */ {antic: 0x0A, colors:  4, isText: false, horizontalResolution:  80, scanLinesPerLine:  4},
-    /* 06 */ {antic: 0x0B, colors:  2, isText: false, horizontalResolution: 160, scanLinesPerLine:  2},
-    /* 07 */ {antic: 0x0D, colors:  4, isText: false, horizontalResolution: 160, scanLinesPerLine:  2},
-    /* 08 */ {antic: 0x0F, colors:  2, isText: false, horizontalResolution: 320, scanLinesPerLine:  1},
-    /* 09 */ {antic: null, colors: 16, isText: false, horizontalResolution:  80, scanLinesPerLine:  1},
-    /* 10 */ {antic: null, colors:  9, isText: false, horizontalResolution:  80, scanLinesPerLine:  1},
-    /* 11 */ {antic: null, colors: 16, isText: false, horizontalResolution:  80, scanLinesPerLine:  1},
-    /* 12 */ {antic: 0x04, colors:  5, isText: true,  horizontalResolution:  40, scanLinesPerLine:  8},
-    /* 13 */ {antic: 0x05, colors:  5, isText: true,  horizontalResolution:  40, scanLinesPerLine: 16},
-    /* 14 */ {antic: 0x0C, colors:  2, isText: false, horizontalResolution: 160, scanLinesPerLine:  1},
-    /* 15 */ {antic: 0x0E, colors:  2, isText: false, horizontalResolution: 160, scanLinesPerLine:  1}
+    /* 0 */ null,
+    /* 1 */ null,
+    /* 2 */ {basic:    0, colors:  2, isText:  true, pixelWidth:  8, pixelHeight:  8},
+    /* 3 */ {basic: null, colors:  2, isText:  true, pixelWidth:  8, pixelHeight: 10},
+    /* 4 */ {basic:   12, colors:  5, isText:  true, pixelWidth:  8, pixelHeight:  8},
+    /* 5 */ {basic:   13, colors:  5, isText:  true, pixelWidth:  8, pixelHeight: 16},
+    /* 6 */ {basic:    1, colors:  5, isText:  true, pixelWidth: 16, pixelHeight:  8},
+    /* 7 */ {basic:    2, colors:  5, isText:  true, pixelWidth: 16, pixelHeight: 16},
+    /* 8 */ {basic:    3, colors:  4, isText: false, pixelWidth:  8, pixelHeight:  8},
+    /* 9 */ {basic:    4, colors:  2, isText: false, pixelWidth:  4, pixelHeight:  4},
+    /* A */ {basic:    5, colors:  4, isText: false, pixelWidth:  4, pixelHeight:  4},
+    /* B */ {basic:    6, colors:  2, isText: false, pixelWidth:  2, pixelHeight:  2},
+    /* C */ {basic: null, colors:  2, isText: false, pixelWidth:  2, pixelHeight:  1},
+    /* D */ {basic:    7, colors:  4, isText: false, pixelWidth:  2, pixelHeight:  2},
+    /* E */ {basic: null, colors:  4, isText: false, pixelWidth:  2, pixelHeight:  1},
+    /* F */ {basic:    8, colors:  2, isText: false, pixelWidth:  1, pixelHeight:  1}
 ];
+
+export const displayListInstructions = {
+    interrupt: 0x80,
+    loadMemoryScan: 0x40,
+    verticalScroll: 0x20,
+    horizontalScroll: 0x10,
+    skip1: 0x00, skip2: 0x10, skip3: 0x20, skip4: 0x30, skip5: 0x40, skip6: 0x50, skip7: 0x60, skip8: 0x70,
+    mode2: 0x02, mode3: 0x03, mode4: 0x04, mode5: 0x05, mode6: 0x06, mode7: 0x07, mode8: 0x08, mode9: 0x09,
+    mode10: 0x0A, mode11: 0x0B, mode12: 0x0C, mode13: 0x0D, mode14: 0x0E, mode15: 0x0F
+};
 
 /**
  * An emulated Antic video coprocessor.
  */
 export class Antic {
-    constructor(screen) {
+    constructor(screen, cpu) {
         this.screen = screen;
+        this.cpu = cpu;
+        this.displayList = 0x9C20;
+    }
+
+    get displayList() {
+        return this.cpu.addressAt(0xD402);
+    }
+    set displayList(address) {
+        address = new Address(address);
+        this.cpu.poke(0x0230, address.LSB, address.MSB);
+        this.cpu.poke(0xD402, address.LSB, address.MSB)
+    }
+
+    step() {
+        const opCode = this.opCode = this.cpu.peek(this.DisplayList);
+        const modeCode = this.modeCode = opCode & 0x0F;
+        const mode = this.mode = graphicModes[modeCode];
+        const linesToSkip = mode ? mode.pixelHeight : (opCode >>> 4) + 1;
+        this.displayListInterrupt = mode ? (opCode & 0x80) != 0 : false;
+        this.loadMemoryScan = mode ? (opCode & 0x40) != 0 : false;
+        this.verticalScroll = mode ? (opCode & 0x20) != 0 : false;
+        this.horizontalScroll = mode ? (opCode & 0x10) != 0 : false;
     }
 }
 
