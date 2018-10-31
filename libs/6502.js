@@ -3,10 +3,9 @@
 // Symbols for private fields
 const aSymbol = Symbol('a'), xSymbol = Symbol('x'), ySymbol = Symbol('y'),
     spSymbol = Symbol('sp'), pcSymbol = Symbol('pc'), srSymbol = ('sr'),
-    memorySymbol = Symbol('memory'), aHandlersSymbol = Symbol('aHandlers'),
-    xHandlersSymbol = Symbol('xHandlers'), yHandlersSymbol = Symbol('yHandlers'),
-    breakpointsSymbol = Symbol('breakpoints'), valueSymbol = Symbol('value'),
-    instructionSetSymbol = Symbol('instructionSet'),
+    aHandlersSymbol = Symbol('aHandlers'), xHandlersSymbol = Symbol('xHandlers'), yHandlersSymbol = Symbol('yHandlers'),
+    memorySymbol = Symbol('memory'), memoryReadSymbol = Symbol('memoryRead'), memoryWriteSymbol = Symbol('memoryWrite'),
+    breakpointsSymbol = Symbol('breakpoints'), valueSymbol = Symbol('value'), instructionSetSymbol = Symbol('instructionSet'),
     evaluateInternalSymbol = Symbol('evaluateInternal');
 
 /**
@@ -17,7 +16,7 @@ const aSymbol = Symbol('a'), xSymbol = Symbol('x'), ySymbol = Symbol('y'),
 export const delegate = (...array) => {
     const result = (...args) => {
         array.forEach(h => {
-            if (result.filter(h.param)) h(...args);
+            if (result.filter(h.param, ...args)) h(...args);
         });
     };
     /**
@@ -42,6 +41,9 @@ export const delegate = (...array) => {
     /**
      * A filter function can be added to a delegate so that not all handlers are executed
      * every time. By default, the filter always returns true.
+     * The filter function receives the parameter that was associated with the handler when
+     * it was added to the delegate as its first parameter, and then the full list of
+     * arguments the delegate was called with.
      * @param {Object} param 
      */
     result.filter = (param) => true;
@@ -1518,6 +1520,7 @@ export default class MCS6502 {
         I = false, Z = false, C = false,
         instructionSet = mcs6502InstructionSet
     } = {}) {
+        this[instructionSetSymbol] = instructionSet;
 
         this[memorySymbol] = memory;
         this[aSymbol] = A;
@@ -1531,13 +1534,16 @@ export default class MCS6502 {
         this[aHandlersSymbol] = delegate();
         this[xHandlersSymbol] = delegate();
         this[yHandlersSymbol] = delegate();
+
         const breakpoints = delegate();
         breakpoints.filter = (param) => {
             const predicate = param.predicate || (() => true);
             return ((!param.address || this.pc === param.address) && predicate(param));
         };
-        this[breakpointsSymbol] = breakpoints
-        this[instructionSetSymbol] = instructionSet;
+        this[breakpointsSymbol] = breakpoints;
+
+        this[memoryReadSymbol] = [];
+        this[memoryWriteSymbol] = [];
     }
 
     /**
@@ -1629,6 +1635,7 @@ export default class MCS6502 {
         this[pcSymbol] = value;
         this[breakpointsSymbol].call(this);
     }
+
     /**
      * Adds a conditional breakpoint for a specific address
      * @param {Address} address The address at which to break
@@ -1638,6 +1645,7 @@ export default class MCS6502 {
     addBreakpoint(address, predicate, handler) {
         this[breakpointsSymbol].add(handler, { address, predicate });
     }
+
     /**
      * Adds a breakpoint for a specific address
      * @param {Address} address The address at which to break
@@ -1646,6 +1654,7 @@ export default class MCS6502 {
     addAddressBreakpoint(address, handler) {
         this[breakpointsSymbol].add(handler, { address });
     }
+
     /**
      * Adds a conditional breakpoint
      * @param {Function} predicate A function that receives the processor, and returns true if the breakpoint handler should be called
@@ -1783,7 +1792,34 @@ export default class MCS6502 {
     }
 
     /**
-     * Reads an address from memory
+     * Sets a memory read access handler for a specific address.
+     * This can be used by coprocessors and other hardware parts of the computer for communication.
+     * @param {Address} address The address for which to handle access
+     * @param {Function} handler The handler function, or null or undefined to remove a previously set handler.
+     *   It takes as its parameter the value in RAM at that address, and it returns a value
+     *   that is substituted for the value in RAM for the caller of peek.
+     *   Peeking directly through the memory object doesn't go through read handlers.
+     */
+    setMemoryReadHandler(address, handler) {
+        if (handler) this[memoryReadSymbol][address] = handler;
+        else delete this[memoryReadSymbol][address];
+    }
+
+    /**
+     * Sets a memory write access handler for a specific address.
+     * This can be used by coprocessors and other hardware parts of the computer for communication.
+     * @param {Address} address The address for which to handle access
+     * @param {Function} handler The handler function, or null or undefined to remove a previously set handler.
+     *   It takes as its parameter the value being written, and it returns nothing.
+     *   Poking directly through the memory object doesn't go through write handlers.
+     */
+    setMemoryWriteHandler(address, handler) {
+        if (handler) this[memoryWriteSymbol][address] = handler;
+        else delete this[memoryWriteSymbol][address];
+    }
+
+    /**
+     * Reads an address from memory without going through read access handlers
      * @param {Address} pointer The address where to look for an address
      * @param {bool} zeroPage If true, the address is constrained to page 0
      * even if the address points at the boundary of the page.
@@ -1794,20 +1830,41 @@ export default class MCS6502 {
     }
 
     /**
-     * Returns the byte at the provided address in memory
+     * Direct access to the low-level memory object.
+     * Prefer high-level methods on the CPU if possible.
+     * @returns {Ram} the memory object.
+     */
+    get memory() {
+        return this[memorySymbol];
+    }
+
+    /**
+     * Returns the byte at the provided address in memory,
+     * or the result of the read access handler for this address if there's one.
      * @param {Address} address The address at which to look
      * @returns {Number} the byte read from memory
      */
     peek(address) {
-        return this[memorySymbol].peek(address);
+        const value = this[memorySymbol].peek(address);
+        const handler = this[memoryReadSymbol][address];
+        if (handler) return handler(value);
+        return value;
     }
     /**
-     * Writes bytes to memory
+     * Writes bytes to memory.
+     * Memory access handlers get called by this method, and get a chance to intercept the write operation.
+     * If a handler exists, the value does not get set in memory (unless the handler itself does it).
+     * If you need to poke without having handlers triggered, go lower-level and poke memory directly.
      * @param {Address} address The address at which to write
      * @param {Number} bytes The bytes to write
      */
     poke(address, ...bytes) {
-        this[memorySymbol].poke(address, ...bytes);
+        const addr = address.valueOf();
+        for (let i = 0, addr = address.valueOf(); i < bytes.length; i++, addr++) {
+            const handler = this[memoryWriteSymbol][address];
+            if (handler) handler(bytes[i]);
+            else this[memorySymbol].poke(addr, bytes[i]);
+        }
     }
 
     /**

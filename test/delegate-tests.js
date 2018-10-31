@@ -71,4 +71,22 @@ describe('delegate', () => {
 
         results.should.deep.equal({one: true, two: true, four: true});
     });
+
+    it('can filter out handlers based on delegate call parameters', () => {
+        const results = {};
+
+        const d = delegate();
+        // The filter returns true if the delegate's parameter equals one of the first two calling arguments
+        d.filter = (p, a, b) => (p === a || p === b);
+
+        d.add(() => {results.one = true;}, 1);
+        d.add(() => {results.two = true;}, 2);
+        d.add(() => {results.three = true;}, 3);
+        d.add(() => {results.four = true;}, 4);
+        d.add(() => {results.five = true;}, 5);
+
+        d(2, 4);
+
+        results.should.deep.equal({two: true, four: true});
+    });
 });
