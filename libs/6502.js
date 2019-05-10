@@ -1850,6 +1850,7 @@ export default class MCS6502 {
         if (handler) return handler(value);
         return value;
     }
+
     /**
      * Writes bytes to memory.
      * Memory access handlers get called by this method, and get a chance to intercept the write operation.
@@ -1859,11 +1860,37 @@ export default class MCS6502 {
      * @param {Number} bytes The bytes to write
      */
     poke(address, ...bytes) {
-        const addr = address.valueOf();
         for (let i = 0, addr = address.valueOf(); i < bytes.length; i++, addr++) {
             const handler = this[memoryWriteSymbol][address];
             if (handler) handler(bytes[i]);
             else this[memorySymbol].poke(addr, bytes[i]);
+        }
+    }
+
+    /**
+     * Reads the specified number of characters from memory, and builds a string out of it.
+     * @param {Address} address The address at which to read the string
+     * @param {Number} length The number of characters to read
+     */
+    peekString(address, length) {
+        const byteArray = new Array(length);
+        for (let i = 0; i < length; i++) {
+            byteArray[i] = this.peek(new Address(address + i));
+        }
+        return String.fromCharCode(...byteArray);
+    }
+
+    /**
+     * Writes the ASCII codes for the provided string characters into memory.
+     * @param {Address} address The address at which to write the string
+     * @param {String} str The string to write to memory
+     */
+    pokeString(address, str) {
+        for (let i = 0; i < str.length; i++) {
+            const addr = address + i;
+            const char = str.charCodeAt(i);
+            if (char > 255) throw new RangeError(`Character ${str[i]} (code ${char}) was out of the ASCII range.`);
+            this.poke(new Address(addr), char);
         }
     }
 

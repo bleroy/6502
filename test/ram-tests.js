@@ -1,4 +1,4 @@
-import { describe, it } from 'mocha';
+import 'mocha';
 import chai, { expect } from 'chai';
 const should = chai.should();
 
@@ -61,5 +61,16 @@ describe('RAM', () => {
         cpu.memory.peek(0x400).should.equal(21);
         cpu.peek(0x400).should.equal(21);
         result.should.deep.equal([]);
+    });
+
+    it('can write strings to memory and read them back', () => {
+        const cpu = new MCS6502();
+        const str = "Far Out in the uncharted backwaters of the unfashionable end of the Western Spiral arm of the galaxy lies a small unregarded yellow sun.";
+        cpu.pokeString(0x200, str);
+        const strReadBack = cpu.peekString(0x200, str.length);
+
+        cpu.memory.peek(0x200).should.equal(70); // F
+        cpu.memory.peek(0x200 + str.length - 1).should.equal(46); // .
+        strReadBack.should.equal(str);
     });
 });
