@@ -1,4 +1,4 @@
-import { describe, it } from 'mocha';
+import 'mocha';
 import chai, { expect } from 'chai';
 const should = chai.should();
 
