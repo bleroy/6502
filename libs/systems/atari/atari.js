@@ -1,4 +1,6 @@
 import MCS6502, { Address } from '../../6502';
+import { Screen } from './screen';
+import { Antic } from './antic';
 
 // TODO: symbols & some immutability
 
@@ -21,79 +23,45 @@ export default class Atari {
 
         this.antic = new Antic(screen, this.cpu);
     }
-}
 
-/**
- * An abstract virtual screen for the Atari system.
- */
-export class Screen {
-    renderPixel(color) { }
-    renderByte(byte, foreground, background) { }
-    horizontalSync() { }
-    verticalSync() { }
-}
-
-/**
- * An implementation of Screen that uses an HTML canvas for rendering.
- */
-export class CanvasScreen extends Screen {
     /**
-     * Creates a screen using the provided canvas.
-     * @param {HTMLCanvasElement} canvas - a canvas element for the screen to use as its surface.
-     * The resolution of the canvas should be at least 320x192, although larger canvases can theoretically
-     * display larger screens, up to 384x240.
-     * 
-     * A screen constructs an image scan line by scan line, then pixel by pixel,because the Atari had the ability
-     * to change arbitrary parameters, such as colors, at any time.
+     * Returns the byte at the provided address in memory,
+     * or the result of the read access handler for this address if there's one.
+     * @param {Address} address The address at which to look
+     * @returns {Number} the byte read from memory
      */
-    constructor(canvas, zoom = 1, smoothing = false) {
-        super();
-
-        this.zoom = zoom;
-
-        this.canvas = canvas;
-        this._context = canvas.getContext('2d');
-
-        const doc = canvas.ownerDocument;
-
-        const scanLine = this._scanLine = doc.createElement("canvas");
-        scanLine.width = 384;
-        scanLine.height = 1;
-        this._scanLineContext = scanLine.getContext('2d');
-        this._lineImageData = this._scanLineContext.createImageData(384, 1);
-
-        this._context.imageSmoothingEnabled = this._scanLineContext.imageSmoothingEnabled = smoothing;
-        this.verticalPosition = 0;
-        this.horizontalPosition = 0;
-        this._lineImageIndex = 0;
+    peek(address) {
+        return this.cpu.peek(address);
     }
 
-    renderPixel(color) {
-        const imgdata = this._lineImageData.data;
-        imgdata[this._lineImageIndex++] = color.r;
-        imgdata[this._lineImageIndex++] = color.g;
-        imgdata[this._lineImageIndex++] = color.b;
-        imgdata[this._lineImageIndex++] = 255;
+    /**
+     * Writes bytes to memory.
+     * Memory access handlers get called by this method, and get a chance to intercept the write operation.
+     * If a handler exists, the value does not get set in memory (unless the handler itself does it).
+     * If you need to poke without having handlers triggered, go lower-level and poke memory directly.
+     * @param {Address} address The address at which to write
+     * @param {Number} bytes The bytes to write
+     */
+    poke(address, ...bytes) {
+        this.cpu.poke(address, ...bytes)
     }
 
-    renderByte(byte, foreground, background) {
-        for (let c = 0; c < 8; c++) {
-            const lit = (byte & (0x80 >>> c)) != 0;
-            this.renderPixel(lit ? foreground : background);
-        }
+    /**
+     * Reads the specified number of characters from memory, and builds a string out of it.
+     * @param {Address} address The address at which to read the string
+     * @param {Number} length The number of characters to read
+     */
+    peekString(address, length) {
+        return this.cpu.peekString(address, length);
     }
 
-    horizontalSync() {
-        this._scanLineContext.putImageData(this._lineImageData, 0, 0);
-        this._context.drawImage(this._scanLine,
-            0, 0, 384, 1,
-            0, this.verticalPosition * this.zoom, 384 * this.zoom, this.zoom);
-        this._lineImageIndex = this.horizontalPosition = 0;
-        this.verticalPosition++;
-    }
-
-    verticalSync() {
-        this.verticalPosition = 0;
+    /**
+     * Writes the ASCII codes for the provided string characters into memory.
+     * @param {Address} address The address at which to write the string
+     * @param {String} str The string to write to memory
+     */
+    pokeString(address, str) {
+        this.cpu.pokeString(address, str);
     }
 }
 
@@ -198,480 +166,6 @@ Color.green = 0xC0;
 Color.darkGreen = 0xD0;
 Color.orangeGreen = 0xE0;
 Color.orange = 0xF0;
-
-/**
- * An emulated Antic video coprocessor combined with a GTIA.
- */
-export class Antic {
-    /**
-     * Constructs a new Antic coprocessor.
-     * @param {Screen} screen - The screen attached to the computer.
-     * @param {MCS6502} cpu - The 6502 CPU of the computer.
-     */
-    constructor(screen, cpu) {
-        this.screen = screen;
-        this.cpu = cpu;
-        this.displayList = 0x9C20;
-        this.dma = 0x7C20;
-        this._remainingLines = 0;
-
-        // WSYNC: causes the computer to wait for the next horizontal sync
-        this.cpu.setMemoryWriteHandler(0xD40A, () => {
-            this.renderScanLine();
-        });
-        // NMIRES: resets non-maskable interrupt status (NMIST)
-        this.cpu.setMemoryWriteHandler(0xD40F, () => {
-            this.cpu.memory.poke(0xD40F, 0);
-        });
-        // Setup default state
-        this.cpu.poke(0xD400, 0x32, 0x02);
-        this.cpu.poke(0x022F, 0x32);
-        this.cpu.poke(0x02F3, 0x02);
-        this.cpu.poke(0xD409, 0xE0);
-        this.cpu.poke(0x02F4, 0xE0);
-    }
-
-    /**
-     * DMACTL bits 0 and 1
-     */
-    get playfieldWidth() {
-        return this.cpu.peek(0xD400) & 0x03;
-    }
-    set playfieldWidth(value) {
-        const rest = this.cpu.peek(0xD400) & 0xFC;
-        this.cpu.poke(0xD400, rest | (value & 0x03));
-    }
-
-    /**
-     * DMACTL bit 2
-     */
-    get missileDMAEnabled() {
-        return (this.cpu.peek(0xD400) & 0x04) !== 0;
-    }
-    set missileDMAEnabled(value) {
-        const rest = this.cpu.peek(0xD400) & 0xFB;
-        this.cpu.poke(0xD400, value ? rest | 0x04 : rest);
-    }
-
-    /**
-     * DMACTL bit 3
-     */
-    get playerDMAEnabled() {
-        return (this.cpu.peek(0xD400) & 0x08) !== 0;
-    }
-    set playerDMAEnabled(value) {
-        const rest = this.cpu.peek(0xD400) & 0xF7;
-        this.cpu.poke(0xD400, value ? rest | 0x08 : rest);
-    }
-
-    /**
-     * DMACTL bit 4
-     */
-    get playerMissileHighResolution() {
-        return (this.cpu.peek(0xD400) & 0x10) !== 0
-    }
-    set playerMissileHighResolution(value) {
-        const rest = this.cpu.peek(0xD400) & 0xEF;
-        this.cpu.poke(0xD400, value ? rest | 0x10 : rest);
-    }
-
-    /**
-     * DMACTL bit 5
-     */
-    get displayListDMAEnabled() {
-        return (this.cpu.peek(0xD400) & 0x20) !== 0;
-    }
-    set displayListDMAEnabled(value) {
-        const rest = this.cpu.peek(0xD400) & 0xDF;
-        this.cpu.poke(0xD400, value ? rest | 0x20 : rest);
-    }
-
-    /**
-     * CHACTL
-     */
-    get characterControl() {
-        return this.cpu.peek(0xD401) & 0x07;
-    }
-    set characterControl(value) {
-        this.cpu.poke(0xD401, value & 0x07);
-    }
-
-    /**
-     * DLISTL/DLISTH
-     */
-    get displayList() {
-        return this.cpu.addressAt(0xD402);
-    }
-    set displayList(address) {
-        address = new Address(address);
-        this.cpu.poke(0xD402, address.LSB, address.MSB)
-    }
-
-    /**
-     * Horizontal fine scrolling in color clock units (equivalent to two pixels in high resolution).
-     * Value ranges between 0 and 15.
-     * HSCROL bits 0-3
-     */
-    get horizontalFineScroll() {
-        return this.cpu.peek(0xD404) & 0x0F;
-    }
-    set horizontalFineScroll(value) {
-        this.cpu.poke(0xD404, value & 0x0F);
-    }
-
-    /**
-     * Vertical fine scrolling in scan lines.
-     * Value ranges between 0 and 15.
-     * VSCROL bits 0-3
-     */
-    get verticalFineScroll() {
-        return this.cpu.peek(0xD405) & 0x0F;
-    }
-    set verticalFineScroll(value) {
-        this.cpu.poke(0xD405, value & 0x0F);
-    }
-
-    /**
-     * PMBASE
-     */
-    get playerMissileBase() {
-        return new Address(this.cpu.peek(0xD407) << 8);
-    }
-    set playerMissileBase(value) {
-        this.cpu.poke(0xD407, value >>> 8);
-    }
-
-    /**
-     * CHBASE
-     */
-    get characterSetBase() {
-        return new Address(this.cpu.peek(0xD409) << 8);
-    }
-    set characterSetBase(value) {
-        this.cpu.poke(0xD409, value >>> 8);
-    }
-
-    /**
-     * VCOUNT * 2
-     */
-    get verticalLineCounter() {
-        return this.cpu.peek(0xD40B) << 1;
-    }
-    set verticalLineCounter(value) {
-        this.cpu.poke(0xD40B, value >>> 1);
-    }
-
-    /**
-     * PENH
-     */
-    get penHorizontalPosition() {
-        return this.cpu.peek(0xD40C);
-    }
-    set penHorizontalPosition(value) {
-        this.cpu.poke(0xD40C, value);
-    }
-
-    /**
-     * PENV
-     */
-    get penVerticalPosition() {
-        return this.cpu.peek(0xD40D);
-    }
-    set penVerticalPosition(value) {
-        this.cpu.poke(0xD40D, value);
-    }
-
-    /**
-     * NMIEN bit 5
-     */
-    get ResetKeyInterruptEnabled() {
-        return (this.cpu.peek(0xD40E) & 0x20) !== 0;
-    }
-    set ResetKeyInterruptEnabled(value) {
-        const rest = this.cpu.peek(0xD40E) & 0xDF;
-        this.cpu.poke(0xD40E, value ? rest | 0x20 : rest);
-    }
-
-    /**
-     * NMIEN bit 6
-     */
-    get VerticalBlankInterruptEnabled() {
-        return (this.cpu.peek(0xD40E) & 0x40) !== 0;
-    }
-    set VerticalBlankInterruptEnabled(value) {
-        const rest = this.cpu.peek(0xD40E) & 0xBF;
-        this.cpu.poke(0xD40E, value ? rest | 0x40 : rest);
-    }
-
-    /**
-     * NMIEN bit 7
-     */
-    get displayListInterruptEnabled() {
-        return (this.cpu.peek(0xD40E) & 0x80) !== 0;
-    }
-    set displayListInterruptEnabled(value) {
-        const rest = this.cpu.peek(0xD40E) & 0x7F;
-        this.cpu.poke(0xD40E, value ? rest | 0x80 : rest);
-    }
-
-    /**
-     * NMIST bit 5
-     */
-    get ResetKeyInterrupt() {
-        return (this.cpu.peek(0xD40F) & 0x20) !== 0;
-    }
-    set ResetKeyInterrupt(value) {
-        const rest = this.cpu.peek(0xD40F) & 0xDF;
-        this.cpu.poke(0xD40F, value ? rest | 0x20 : rest);
-    }
-
-    /**
-     * NMIST bit 6
-     */
-    get VerticalBlankInterrupt() {
-        return (this.cpu.peek(0xD40F) & 0x40) !== 0;
-    }
-    set VerticalBlankInterrupt(value) {
-        const rest = this.cpu.peek(0xD40F) & 0xBF;
-        this.cpu.poke(0xD40F, value ? rest | 0x40 : rest);
-    }
-
-    /**
-     * NMIST bit 7
-     */
-    get displayListInterrupt() {
-        return (this.cpu.peek(0xD40F) & 0x80) !== 0;
-    }
-    set displayListInterrupt(value) {
-        const rest = this.cpu.peek(0xD40F) & 0x7F;
-        this.cpu.poke(0xD40F, value ? rest | 0x80 : rest);
-    }
-
-    /**
-     * The horizontal coordinate of player 0
-     */
-    get player0Position() {
-        return (this.cpu.peek(0xD000));
-    }
-    set player0Position(value) {
-        this.cpu.poke(0xD000, value);
-    }
-
-    /**
-     * Composition options (graphics priority selector).
-     * GPRIOR
-     */
-    get compositionOptions() {
-        return (this.cpu.peek(0xD01B));
-    }
-    set compositionOptions(value) {
-        this.cpu.poke(0xD01B, value);
-    }
-
-    /**
-     * The color of player 0
-     */
-    get player0Color() {
-        return this.cpu.peek(0xD012);
-    }
-    set player0Color(color) {
-        this.cpu.poke(0xD012, color);
-    }
-
-    /**
-     * The color of player 1
-     */
-    get player1Color() {
-        return this.cpu.peek(0xD013);
-    }
-    set player1Color(color) {
-        this.cpu.poke(0xD013, color);
-    }
-
-    /**
-     * The color of player 2
-     */
-    get player2Color() {
-        return this.cpu.peek(0xD014);
-    }
-    set player2Color(color) {
-        this.cpu.poke(0xD014, color);
-    }
-
-    /**
-     * The color of player 3
-     */
-    get player3Color() {
-        return this.cpu.peek(0xD015);
-    }
-    set player3Color(color) {
-        this.cpu.poke(0xD015, color);
-    }
-
-    /**
-     * Color 0
-     */
-    get color0() {
-        return this.cpu.peek(0xD016);
-    }
-    set color0(color) {
-        this.cpu.poke(0xD016, color);
-    }
-
-    /**
-     * Color 1
-     */
-    get color1() {
-        return this.cpu.peek(0xD017);
-    }
-    set color1(color) {
-        this.cpu.poke(0xD017, color);
-    }
-
-    /**
-     * Color 2
-     */
-    get color2() {
-        return this.cpu.peek(0xD018);
-    }
-    set color2(color) {
-        this.cpu.poke(0xD018, color);
-    }
-
-    /**
-     * Color 3
-     */
-    get color3() {
-        return this.cpu.peek(0xD019);
-    }
-    set color3(color) {
-        this.cpu.poke(0xD019, color);
-    }
-
-    /**
-     * The background color (also referred to as Color 4).
-     */
-    get background() {
-        return this.cpu.peek(0xD01A);
-    }
-    set background(color) {
-        this.cpu.poke(0xD01A, color);
-    }
-
-    step() {
-        const opCode = this.opCode = this.cpu.peek(this.DisplayList);
-        const modeCode = this.modeCode = opCode & 0x0F;
-        if (modeCode === 0) {
-            // blank lines
-            this._remainingLines = ((opCode & 0xF0) >>> 4) + 1;
-            this.displayList++;
-            return;
-        }
-        if (modeCode === 1) {
-            // Jump
-            this.displayList = this.cpu.addressAt(this.displayList + 1);
-            if (opCode & 0x40) this.screen.verticalSync();
-            return;
-        }
-        this.mode = graphicModes[modeCode];
-        this._remainingLines = mode ? mode.pixelHeight : (opCode >>> 4) + 1;
-        this.verticalScroll = mode ? (opCode & 0x20) !== 0 : false;
-        this.horizontalScroll = mode ? (opCode & 0x10) !== 0 : false;
-        this.displayListInterrupt = mode ? (opCode & 0x80) !== 0 : false;
-        if (this.loadMemoryScan = mode ? (opCode & 0x40) !== 0 : false) {
-            this.dma = this.cpu.addressAt(this.displayList + 1);
-            this.displayList += 3;
-        }
-        else this.displayList++;
-    }
-
-    renderScanLine() {
-        // Read the next instruction if we're done with the previous one
-        if (this._remainingLines == 0) {
-            // Advance until we have something to render
-            do {
-                this.step();
-            } while (this.modeCode === 0)
-        }
-        // render a line
-        switch (this.modeCode) {
-            case 1: // blank 
-                for (let i = 0; i < 48; i++) this.screen.renderByte(0x00, null, this.cpu.background);
-                break;
-            case 2: 
-        }
-        this.screen.horizontalSync();
-        this._remainingLines--;
-        if (this._remainingLines === 0 && this.displayListInterrupt && this.displayListInterruptEnabled) {
-            // Display List Interrupt
-        }
-    }
-
-    verticalSync() {
-        // TODO: copy shadow registers
-        this.screen.verticalSync();
-    }
-}
-
-/**
- * Antic graphic modes enumeration
- */
-Antic.modes = [
-    /* 0 */ null,
-    /* 1 */ null,
-    /* 2 */ { basic: 0, colors: 2, isText: true, pixelWidth: 8, pixelHeight: 8 },
-    /* 3 */ { basic: null, colors: 2, isText: true, pixelWidth: 8, pixelHeight: 10 },
-    /* 4 */ { basic: 12, colors: 5, isText: true, pixelWidth: 8, pixelHeight: 8 },
-    /* 5 */ { basic: 13, colors: 5, isText: true, pixelWidth: 8, pixelHeight: 16 },
-    /* 6 */ { basic: 1, colors: 5, isText: true, pixelWidth: 16, pixelHeight: 8 },
-    /* 7 */ { basic: 2, colors: 5, isText: true, pixelWidth: 16, pixelHeight: 16 },
-    /* 8 */ { basic: 3, colors: 4, isText: false, pixelWidth: 8, pixelHeight: 8 },
-    /* 9 */ { basic: 4, colors: 2, isText: false, pixelWidth: 4, pixelHeight: 4 },
-    /* A */ { basic: 5, colors: 4, isText: false, pixelWidth: 4, pixelHeight: 4 },
-    /* B */ { basic: 6, colors: 2, isText: false, pixelWidth: 2, pixelHeight: 2 },
-    /* C */ { basic: null, colors: 2, isText: false, pixelWidth: 2, pixelHeight: 1 },
-    /* D */ { basic: 7, colors: 4, isText: false, pixelWidth: 2, pixelHeight: 2 },
-    /* E */ { basic: null, colors: 4, isText: false, pixelWidth: 2, pixelHeight: 1 },
-    /* F */ { basic: 8, colors: 2, isText: false, pixelWidth: 1, pixelHeight: 1 }
-];
-
-/**
- * Antic display list instruction opcodes.
- */
-Antic.displayListInstructions = {
-    interrupt: 0x80,
-    loadMemoryScan: 0x40,
-    verticalScroll: 0x20,
-    horizontalScroll: 0x10,
-    skip1: 0x00, skip2: 0x10, skip3: 0x20, skip4: 0x30, skip5: 0x40, skip6: 0x50, skip7: 0x60, skip8: 0x70,
-    mode2: 0x02, mode3: 0x03, mode4: 0x04, mode5: 0x05, mode6: 0x06, mode7: 0x07, mode8: 0x08, mode9: 0x09,
-    mode10: 0x0A, mode11: 0x0B, mode12: 0x0C, mode13: 0x0D, mode14: 0x0E, mode15: 0x0F
-};
-
-Antic.playfieldWidth = {
-    disabled: 0, // no playfield display
-    narrow: 1,   // 128 color clocks / 256 hi-res pixels
-    normal: 2,   // 160 color clocks / 320 hi-res pixels
-    wide: 3      // 192 color clocks / 384 hi-res pixels
-};
-
-Antic.characterControl = {
-    blankInverse: 0x01, // Inverse video characters display as blank spaces
-    inverse: 0x02,      // Inverse video characters display as inverse video (default)
-    reflect: 0x04,      // All characters are displayed vertically mirrored
-};
-
-Antic.compositionOptions = {
-    playerPlayfield: 1,               // All players are in front of the playfield
-    players01Playfieldplayers23: 2,   // Players 0 and 1 are in front, then the playfield, then players 2 and 3
-    playfieldPlayers: 4,              // The playfield is in front of players
-    playfield01PlayersPlayfield23: 8, // Playfield colors 0 and 1 are in front, then players, then playfield colors 2 and 3
-    fifthPlayer: 16,                  // The four missiles are combined to form a fifth player
-    coloredOverlap: 32,               // Player overlaps (players 0 and 1, or 2 and 3) are the OR combination of the two player colors
-    gtiaMode9: 64,                    // GTIA graphics mode 9
-    gtiaMode10: 128,                  // GTIA graphics mode 10
-    gtiaMode11: 192                   // GTIA graphics mode 11
-};
 
 /**
  * The raw data for the standard Atari character set
