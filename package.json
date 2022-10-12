@@ -45,7 +45,7 @@
     "npm": "^8.19.2",
     "nyc": "^14.1.1",
     "webpack": "^4.8.2",
-    "webpack-cli": "^3.2.3"
+    "webpack-cli": "^3.3.12"
   },
   "dependencies": {}
 }
